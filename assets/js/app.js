@@ -103,7 +103,37 @@ const ensureChart = () => {
     return chartLibraryPromise;
 };
 
+const setSelectValue = (select, value) => {
+    if (!select) {
+        return;
+    }
+    select.value = value ?? '';
+    if (select._choices) {
+        select._choices.setChoiceByValue(String(select.value));
+    }
+};
+
 const fillSelect = (select, options, placeholder = 'Все') => {
+    if (select?._choices) {
+        const choices = [];
+        if (placeholder) {
+            choices.push({
+                value: '',
+                label: placeholder,
+                selected: true,
+            });
+        }
+        options.forEach((opt) => {
+            choices.push({
+                value: opt.value,
+                label: opt.label,
+            });
+        });
+        select._choices.clearChoices();
+        select._choices.setChoices(choices, 'value', 'label', true);
+        setSelectValue(select, select.value);
+        return;
+    }
     select.innerHTML = '';
     if (placeholder) {
         const empty = document.createElement('option');
@@ -123,7 +153,11 @@ const setFormValues = (form, values) => {
     Object.entries(values).forEach(([key, value]) => {
         const field = form.querySelector(`[name="${key}"]`);
         if (field) {
-            field.value = value ?? '';
+            if (field.tagName === 'SELECT') {
+                setSelectValue(field, value);
+            } else {
+                field.value = value ?? '';
+            }
         }
     });
 };
@@ -194,8 +228,27 @@ const selectFirstOption = (select) => {
     }
     const option = Array.from(select.options).find((opt) => opt.value);
     if (option) {
-        select.value = option.value;
+        setSelectValue(select, option.value);
     }
+};
+
+const initSelectEnhancements = () => {
+    if (!window.Choices) {
+        return;
+    }
+    document.querySelectorAll('select').forEach((select) => {
+        if (select.dataset.choicesInitialized) {
+            return;
+        }
+        const instance = new window.Choices(select, {
+            searchEnabled: false,
+            itemSelectText: '',
+            shouldSort: false,
+            allowHTML: false,
+        });
+        select.dataset.choicesInitialized = 'true';
+        select._choices = instance;
+    });
 };
 
 document.addEventListener('click', (event) => {
@@ -288,7 +341,7 @@ const initTransactionModal = async () => {
         const options = await loadCategories(type);
         fillSelect(categorySelect, options, 'Без категории');
         if (selectedValue) {
-            categorySelect.value = selectedValue;
+            setSelectValue(categorySelect, selectedValue);
         } else {
             selectFirstOption(categorySelect);
         }
@@ -299,7 +352,7 @@ const initTransactionModal = async () => {
         form.reset();
         const isEdit = Boolean(transaction);
         const resolvedType = type || transaction?.tx_type || typeSelect.value || 'expense';
-        typeSelect.value = resolvedType;
+        setSelectValue(typeSelect, resolvedType);
         title.textContent = getTitle(resolvedType, isEdit);
         transactionId.value = transaction?.transaction_id ?? '';
         dateInput.value = transaction?.tx_date ? normalizeDateTime(transaction.tx_date) : formatDateTimeLocal(new Date());
@@ -314,7 +367,7 @@ const initTransactionModal = async () => {
                 merchant: transaction.merchant_name,
             });
             if (transaction.category_id) {
-                categorySelect.value = transaction.category_id;
+                setSelectValue(categorySelect, transaction.category_id);
             }
         }
 
@@ -387,12 +440,12 @@ const initTransferModal = ({ onSaved } = {}) => {
         fillSelect(toSelect, accounts, 'Выберите');
 
         if (accounts.length > 0) {
-            fromSelect.value = accounts[0].value;
+            setSelectValue(fromSelect, accounts[0].value);
         }
         if (accounts.length > 1) {
-            toSelect.value = accounts[1].value;
+            setSelectValue(toSelect, accounts[1].value);
         } else if (accounts.length === 1) {
-            toSelect.value = accounts[0].value;
+            setSelectValue(toSelect, accounts[0].value);
         }
     };
 
@@ -1335,6 +1388,7 @@ const page = document.body.dataset.page;
 
 setupLogout();
 initAuthForms();
+initSelectEnhancements();
 
 if (page === 'dashboard') {
     initDashboard().catch(console.error);
