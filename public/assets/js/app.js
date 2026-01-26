@@ -481,6 +481,7 @@ const initTransferModal = ({ onSaved } = {}) => {
     const fromSelect = byId('transfer-quick-from');
     const toSelect = byId('transfer-quick-to');
     const dateInput = byId('transfer-quick-date');
+    const amountInput = form.querySelector('input[name="amount"]');
 
     let accountsCache = null;
 
@@ -527,6 +528,15 @@ const initTransferModal = ({ onSaved } = {}) => {
         if (onSaved) {
             await onSaved();
         }
+    });
+
+    modal.querySelectorAll('[data-amount-delta]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const delta = Number(btn.dataset.amountDelta || 0);
+            const current = Number(amountInput.value || 0);
+            const next = Math.max(0, current + delta);
+            amountInput.value = next ? next.toFixed(2) : '';
+        });
     });
 
     document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
