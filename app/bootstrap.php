@@ -6,6 +6,8 @@ define('BASE_PATH', dirname(__DIR__));
 
 define('APP_PATH', BASE_PATH . '/app');
 
+require BASE_PATH . '/config/db.php';
+
 spl_autoload_register(static function ($class) {
     $prefix = 'App\\';
     if (strpos($class, $prefix) === 0) {

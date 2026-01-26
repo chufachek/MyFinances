@@ -2,7 +2,7 @@
 
 class DB
 {
-    public static $dsn = 'mysql:dbname=' . DB_NAME . ';host=' . DB_HOST;
+    public static $dsn = 'mysql:dbname=' . DB_NAME . ';host=' . DB_HOST . ';charset=' . DB_CHARSET;
     public static $user = DB_USER;
     public static $pass = DB_PASS;
 
@@ -19,7 +19,7 @@ class DB
                     self::$dsn,
                     self::$user,
                     self::$pass,
-                    [PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8'"]
+                    [PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES '" . DB_CHARSET . "'"]
                 );
                 self::$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } catch (PDOException $e) {
