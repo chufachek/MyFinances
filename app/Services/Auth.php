@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use PDO;
-
 class Auth
 {
     private static $usersColumns = null;
@@ -28,8 +26,7 @@ class Auth
 
     public static function login($email, $password)
     {
-        $pdo = Database::connection();
-        $columns = self::usersColumns($pdo);
+        $columns = self::usersColumns();
         $passwordColumn = self::resolveColumn($columns, ['password_hash', 'password']);
         $nameColumn = self::resolveColumn($columns, ['full_name', 'name']);
         $statusColumn = in_array('status', $columns, true) ? 'status' : null;
@@ -47,9 +44,7 @@ class Auth
             $where .= ' AND status = "active"';
         }
         $sql = sprintf('SELECT %s FROM users WHERE %s', implode(', ', $selectFields), $where);
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(['email' => $email]);
-        $user = $stmt->fetch();
+        $user = DB::getRow($sql, ['email' => $email]);
         if (!$user || !password_verify($password, $user[$passwordColumn])) {
             return false;
         }
@@ -64,14 +59,12 @@ class Auth
 
     public static function register($email, $password, $fullName = null)
     {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT user_id FROM users WHERE email = :email');
-        $stmt->execute(['email' => $email]);
-        if ($stmt->fetch()) {
+        $existing = DB::getRow('SELECT user_id FROM users WHERE email = :email', ['email' => $email]);
+        if (!empty($existing)) {
             return ['success' => false, 'message' => 'Email уже зарегистрирован'];
         }
 
-        $columns = self::usersColumns($pdo);
+        $columns = self::usersColumns();
         $passwordColumn = self::resolveColumn($columns, ['password_hash', 'password']);
         $nameColumn = self::resolveColumn($columns, ['full_name', 'name']);
 
@@ -88,9 +81,7 @@ class Auth
         $placeholders = implode(', ', array_map(static function ($key) {
             return ':' . $key;
         }, array_keys($fields)));
-        $insert = $pdo->prepare(sprintf('INSERT INTO users (%s) VALUES (%s)', $columnsSql, $placeholders));
-        $insert->execute($fields);
-        $userId = (int) $pdo->lastInsertId();
+        $userId = (int) DB::add(sprintf('INSERT INTO users (%s) VALUES (%s)', $columnsSql, $placeholders), $fields);
         $_SESSION['user_id'] = $userId;
         $_SESSION['user_name'] = $fullName ?: $email;
         return ['success' => true, 'user_id' => $userId];
@@ -102,36 +93,37 @@ class Auth
         $_SESSION = [];
     }
 
-    public static function user(PDO $pdo)
+    public static function user()
     {
         $userId = self::userId();
         if (!$userId) {
             return null;
         }
-        $columns = self::usersColumns($pdo);
+        $columns = self::usersColumns();
         $nameColumn = self::resolveColumn($columns, ['full_name', 'name']);
         $selectFields = ['user_id', 'email'];
         if ($nameColumn) {
             $selectFields[] = $nameColumn;
         }
-        $stmt = $pdo->prepare(sprintf('SELECT %s FROM users WHERE user_id = :id', implode(', ', $selectFields)));
-        $stmt->execute(['id' => $userId]);
-        $user = $stmt->fetch() ?: null;
+        $user = DB::getRow(
+            sprintf('SELECT %s FROM users WHERE user_id = :id', implode(', ', $selectFields)),
+            ['id' => $userId]
+        );
+        $user = $user ?: null;
         if ($user && $nameColumn && $nameColumn !== 'full_name') {
             $user['full_name'] = $user[$nameColumn];
         }
         return $user;
     }
 
-    private static function usersColumns(PDO $pdo)
+    private static function usersColumns()
     {
         if (self::$usersColumns !== null) {
             return self::$usersColumns;
         }
 
-        $stmt = $pdo->query('SHOW COLUMNS FROM users');
         $columns = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach (DB::getAll('SHOW COLUMNS FROM users') as $row) {
             $columns[] = $row['Field'];
         }
         self::$usersColumns = $columns;

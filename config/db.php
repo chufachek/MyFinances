@@ -1,9 +1,15 @@
 <?php
 
+defined('DB_HOST') || define('DB_HOST', 'localhost');
+defined('DB_NAME') || define('DB_NAME', 'nikolxz1_2');
+defined('DB_USER') || define('DB_USER', 'nikolxz1_2');
+defined('DB_PASS') || define('DB_PASS', 'Qwerty228;');
+defined('DB_CHARSET') || define('DB_CHARSET', 'utf8');
+
 return [
-    'host' => '127.0.0.1',
-    'dbname' => 'my_finances',
-    'user' => 'root',
-    'password' => '',
-    'charset' => 'utf8mb4',
+    'host' => DB_HOST,
+    'dbname' => DB_NAME,
+    'user' => DB_USER,
+    'password' => DB_PASS,
+    'charset' => DB_CHARSET,
 ];

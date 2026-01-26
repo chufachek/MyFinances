@@ -17,4 +17,5 @@ spl_autoload_register(static function ($class) {
     }
 });
 
+require APP_PATH . '/Services/DB.php';
 require APP_PATH . '/Services/Bramus/Router/Router.php';
