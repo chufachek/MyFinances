@@ -332,6 +332,10 @@ a {
     align-items: center;
 }
 
+.form-actions .btn-outline {
+    background: transparent;
+}
+
 .btn {
     padding: 10px 16px;
     border-radius: 999px;
