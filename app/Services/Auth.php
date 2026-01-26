@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use DB;
+
 class Auth
 {
     private static $usersColumns = null;
