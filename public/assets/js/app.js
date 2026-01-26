@@ -92,13 +92,25 @@ const serializeForm = (form) => Object.fromEntries(new FormData(form).entries())
 
 let chartLibraryPromise;
 const ensureChart = () => {
-    if (typeof Chart !== 'undefined') {
-        return Promise.resolve(Chart);
+    if (window.Chart) {
+        return Promise.resolve(window.Chart);
     }
     if (!chartLibraryPromise) {
-        chartLibraryPromise = import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js')
-            .then((mod) => mod.Chart ?? mod.default ?? mod)
-            .catch(() => null);
+        chartLibraryPromise = new Promise((resolve) => {
+            const existing = document.querySelector('script[data-chartjs]');
+            if (existing) {
+                existing.addEventListener('load', () => resolve(window.Chart ?? null), { once: true });
+                existing.addEventListener('error', () => resolve(null), { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+            script.async = true;
+            script.dataset.chartjs = 'true';
+            script.onload = () => resolve(window.Chart ?? null);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+        });
     }
     return chartLibraryPromise;
 };
@@ -1260,6 +1272,7 @@ const initReports = async () => {
     let lineChart;
 
     const load = async () => {
+        const chartLib = await ensureChart();
         const data = serializeForm(filterForm);
         const month = data.month || new Date().toISOString().slice(0, 7);
         monthPicker.value = month;
@@ -1275,21 +1288,23 @@ const initReports = async () => {
         const labels = pie.items.map((item) => item.name);
         const values = pie.items.map((item) => item.total);
 
-        if (pieChart) {
-            pieChart.destroy();
+        if (chartLib && pieCtx) {
+            if (pieChart) {
+                pieChart.destroy();
+            }
+            pieChart = new chartLib(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
+                        },
+                    ],
+                },
+            });
         }
-        pieChart = new Chart(pieCtx, {
-            type: 'doughnut',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        data: values,
-                        backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
-                    },
-                ],
-            },
-        });
 
         renderTable(
             table,
@@ -1301,29 +1316,31 @@ const initReports = async () => {
             })
         );
 
-        if (lineChart) {
-            lineChart.destroy();
+        if (chartLib && lineCtx) {
+            if (lineChart) {
+                lineChart.destroy();
+            }
+            lineChart = new chartLib(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: line.labels,
+                    datasets: [
+                        {
+                            label: 'Доходы',
+                            data: line.income,
+                            borderColor: '#2f7a4d',
+                            backgroundColor: 'rgba(47, 122, 77, 0.15)',
+                        },
+                        {
+                            label: 'Расходы',
+                            data: line.expense,
+                            borderColor: '#b42318',
+                            backgroundColor: 'rgba(180, 35, 24, 0.1)',
+                        },
+                    ],
+                },
+            });
         }
-        lineChart = new Chart(lineCtx, {
-            type: 'line',
-            data: {
-                labels: line.labels,
-                datasets: [
-                    {
-                        label: 'Доходы',
-                        data: line.income,
-                        borderColor: '#2f7a4d',
-                        backgroundColor: 'rgba(47, 122, 77, 0.15)',
-                    },
-                    {
-                        label: 'Расходы',
-                        data: line.expense,
-                        borderColor: '#b42318',
-                        backgroundColor: 'rgba(180, 35, 24, 0.1)',
-                    },
-                ],
-            },
-        });
     };
 
     filterForm.addEventListener('change', load);

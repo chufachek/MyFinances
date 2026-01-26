@@ -429,39 +429,40 @@ h3 {
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
+    gap: 12px;
 }
 
 .chart-card {
-    min-height: 320px;
+    min-height: 260px;
+    padding: 16px;
 }
 
 .chart-card canvas {
     width: 100%;
-    max-height: 260px;
+    max-height: 200px;
 }
 
 .chart-split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 16px;
+    gap: 12px;
     align-items: center;
 }
 
 .stat-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .stat-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: var(--radius-sm);
     background: var(--gray-100);
-    font-size: 13px;
+    font-size: 12px;
     color: var(--gray-700);
 }
 
