@@ -18,6 +18,7 @@
     </div>
     <?php if (!isset($showSidebar) || $showSidebar !== false) : ?>
         <?php require __DIR__ . '/partials/transaction-modal.php'; ?>
+        <?php require __DIR__ . '/partials/transfer-modal.php'; ?>
     <?php endif; ?>
     <div id="toast-container" class="toast-container"></div>
 
