@@ -208,6 +208,9 @@ a {
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
 }
 
 .table__row .btn-outline {
@@ -330,6 +333,10 @@ a {
     display: flex;
     gap: 12px;
     align-items: center;
+}
+
+.form-actions .btn-outline {
+    background: transparent;
 }
 
 .btn {
