@@ -180,6 +180,8 @@ a {
 .table {
     display: grid;
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .table__row {
@@ -197,6 +199,19 @@ a {
     background: transparent;
     box-shadow: none;
     padding: 0;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.table__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.table__row .btn-outline {
+    background: transparent;
 }
 
 .table__row--header {
