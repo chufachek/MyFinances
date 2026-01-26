@@ -85,16 +85,13 @@
                             <label class="field">
                                 <span>Сумма</span>
                                 <div class="amount-control">
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-500">-500</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
                                     <input class="amount-control__input" type="number" step="0.01" name="amount" required>
-                                    <div class="amount-control__buttons">
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="50">+50</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="200">+200</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="2000">+2000</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="5000">+5000</button>
-                                    </div>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
                                 </div>
                             </label>
                             <label class="field">
@@ -147,16 +144,13 @@
                             <label class="field">
                                 <span>Сумма</span>
                                 <div class="amount-control">
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-500">-500</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
                                     <input class="amount-control__input" type="number" step="0.01" name="amount" required>
-                                    <div class="amount-control__buttons">
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-50">-50</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-200">-200</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-500">-500</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-2000">-2000</button>
-                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-5000">-5000</button>
-                                    </div>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
+                                    <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
                                 </div>
                             </label>
                             <label class="field">

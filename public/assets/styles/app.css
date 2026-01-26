@@ -235,6 +235,12 @@ h3 {
     transition: transform var(--transition), background var(--transition);
 }
 
+.table__row > div {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
 .table__row:not(.table__row--header):hover {
     background: #eef5f0;
     transform: translateX(2px);
@@ -528,18 +534,14 @@ h3 {
 
 .amount-control {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
 }
 
 .amount-control__input {
-    width: 100%;
-}
-
-.amount-control__buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    width: min(160px, 100%);
+    min-width: 140px;
 }
 
 .toast-container {
