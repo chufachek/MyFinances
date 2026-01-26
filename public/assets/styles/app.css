@@ -511,6 +511,41 @@ h3 {
     gap: 16px;
 }
 
+.amount-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.amount-control__input {
+    width: 100%;
+}
+
+.amount-control__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media (max-width: 640px) {
+    .modal {
+        padding: 0;
+    }
+
+    .modal__dialog {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+        padding: 20px;
+        justify-content: flex-start;
+    }
+
+    .modal__header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
 @keyframes modal-in {
     from {
         transform: translateY(20px);

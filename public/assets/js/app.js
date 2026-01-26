@@ -155,6 +155,8 @@ const closeAllModals = () => {
     document.querySelectorAll('.modal.is-open').forEach((modal) => closeModal(modal));
 };
 
+const formatDateInput = (date) => date.toISOString().slice(0, 10);
+
 document.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -304,6 +306,118 @@ const initTransactionModal = async () => {
     });
 
     return { open, setOnSaved };
+};
+
+// Инициализация модалок добавления доходов и расходов.
+const initIncomeExpenseModals = async ({ onSaved } = {}) => {
+    const configs = [
+        { id: 'income-modal', type: 'income' },
+        { id: 'expense-modal', type: 'expense' },
+    ];
+    const state = {
+        accountOptions: null,
+    };
+
+    // Единоразово загружаем счета для обоих модалок.
+    const loadAccounts = async () => {
+        if (state.accountOptions) {
+            return state.accountOptions;
+        }
+        try {
+            const accounts = await getJson('/api/accounts');
+            state.accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
+        } catch (error) {
+            showError('Не удалось загрузить список счетов.');
+            state.accountOptions = [];
+        }
+        return state.accountOptions;
+    };
+
+    // Категории подгружаются отдельно для доходов и расходов.
+    const loadCategories = async (type) => {
+        try {
+            const { categories } = await getJson(`/api/categories?type=${type}`);
+            return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
+        } catch (error) {
+            showError('Не удалось загрузить категории.');
+            return [];
+        }
+    };
+
+    const setupModal = (config) => {
+        const modal = byId(config.id);
+        if (!modal) {
+            return null;
+        }
+
+        const form = modal.querySelector('form');
+        const accountSelect = form.querySelector('select[name="account_id"]');
+        const categorySelect = form.querySelector('select[name="category_id"]');
+        const dateInput = form.querySelector('input[name="tx_date"]');
+        const amountInput = form.querySelector('input[name="amount"]');
+
+        // Подготовка формы перед каждым открытием.
+        const setDefaults = async () => {
+            form.reset();
+            dateInput.value = formatDateInput(new Date());
+            const accounts = await loadAccounts();
+            fillSelect(accountSelect, accounts, 'Выберите');
+            const categories = await loadCategories(config.type);
+            fillSelect(categorySelect, categories, 'Без категории');
+        };
+
+        // Мини-калькулятор для быстрого изменения суммы.
+        modal.querySelectorAll('[data-amount-delta]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const delta = Number(btn.dataset.amountDelta || 0);
+                const current = Number(amountInput.value || 0);
+                const next = Math.max(0, current + delta);
+                amountInput.value = next ? next.toFixed(2) : '';
+            });
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = serializeForm(form);
+            const amountValue = Number(data.amount || 0);
+            if (!data.account_id) {
+                showError('Выберите счёт.');
+                return;
+            }
+            if (amountValue <= 0) {
+                showError('Сумма должна быть больше нуля.');
+                amountInput.focus();
+                return;
+            }
+            await requestWithToast(
+                () => postJson('/api/transactions', data),
+                config.type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
+            );
+            closeModal(modal);
+            if (onSaved) {
+                await onSaved();
+            }
+        });
+
+        return {
+            open: async () => {
+                await setDefaults();
+                openModal(modal);
+            },
+        };
+    };
+
+    const instances = configs.map((config) => setupModal(config));
+
+    const incomeBtn = byId('add-income-btn');
+    const expenseBtn = byId('add-expense-btn');
+
+    if (incomeBtn && instances[0]) {
+        incomeBtn.addEventListener('click', () => instances[0].open());
+    }
+    if (expenseBtn && instances[1]) {
+        expenseBtn.addEventListener('click', () => instances[1].open());
+    }
 };
 
 const initAuthForms = () => {
@@ -562,6 +676,7 @@ const initDashboard = async () => {
     if (transactionModal) {
         transactionModal.setOnSaved(loadDashboard);
     }
+    await initIncomeExpenseModals({ onSaved: loadDashboard });
 
     const initQuickActions = async () => {
         if (!transferForm) {
@@ -874,6 +989,7 @@ const initTransactions = async () => {
     if (transactionModal) {
         transactionModal.setOnSaved(loadTransactions);
     }
+    await initIncomeExpenseModals({ onSaved: loadTransactions });
 
     byId('transfer-form').addEventListener('submit', async (event) => {
         event.preventDefault();
