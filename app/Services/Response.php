@@ -1,12 +1,10 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
 class Response
 {
-    public static function json(array $payload, int $status = 200): void
+    public static function json(array $payload, $status = 200)
     {
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');

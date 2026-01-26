@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,12 +9,12 @@ use App\Services\Database;
 
 class AuthController
 {
-    public function register(): void
+    public function register()
     {
         $data = Request::data();
-        $email = trim((string)($data['email'] ?? ''));
-        $password = (string)($data['password'] ?? '');
-        $name = trim((string)($data['full_name'] ?? '')) ?: null;
+        $email = trim((string)(isset($data['email']) ? $data['email'] : ''));
+        $password = (string)(isset($data['password']) ? $data['password'] : '');
+        $name = trim((string)(isset($data['full_name']) ? $data['full_name'] : '')) ?: null;
 
         if ($email === '' || $password === '') {
             Response::json(['error' => 'Email и пароль обязательны'], 422);
@@ -32,11 +30,11 @@ class AuthController
         Response::json(['success' => true]);
     }
 
-    public function login(): void
+    public function login()
     {
         $data = Request::data();
-        $email = trim((string)($data['email'] ?? ''));
-        $password = (string)($data['password'] ?? '');
+        $email = trim((string)(isset($data['email']) ? $data['email'] : ''));
+        $password = (string)(isset($data['password']) ? $data['password'] : '');
 
         if ($email === '' || $password === '') {
             Response::json(['error' => 'Email и пароль обязательны'], 422);
@@ -51,13 +49,13 @@ class AuthController
         Response::json(['success' => true]);
     }
 
-    public function logout(): void
+    public function logout()
     {
         Auth::logout();
         Response::json(['success' => true]);
     }
 
-    public function me(): void
+    public function me()
     {
         $pdo = Database::connection();
         $user = Auth::user($pdo);

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 require __DIR__ . '/../app/bootstrap.php';
 
 use App\Controllers\AccountsController;
@@ -17,12 +15,13 @@ use App\Services\Response;
 
 $router = new \Bramus\Router\Router();
 
-$basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+$scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '/';
+$basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
 if ($basePath !== '') {
     $router->setBasePath($basePath);
 }
 
-$render = static function (string $view, array $data = []): void {
+$render = static function ($view, array $data = array()) {
     $viewFile = __DIR__ . '/../app/Views/' . $view . '.php';
     if (!file_exists($viewFile)) {
         http_response_code(404);
@@ -39,8 +38,12 @@ $render = static function (string $view, array $data = []): void {
     require __DIR__ . '/../app/Views/layout.php';
 };
 
-$router->before('GET|POST|PUT|DELETE', '/api/.*', static function (): void {
-    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '';
+$router->before('GET|POST|PUT|DELETE', '/api/.*', static function () {
+    $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
+    $path = parse_url($requestUri, PHP_URL_PATH);
+    if ($path === null || $path === false) {
+        $path = '';
+    }
     if (in_array($path, ['/api/auth/login', '/api/auth/register'], true)) {
         return;
     }
@@ -50,45 +53,49 @@ $router->before('GET|POST|PUT|DELETE', '/api/.*', static function (): void {
     }
 });
 
-$authRequired = static function (): void {
+$authRequired = static function () {
     if (!Auth::check()) {
         header('Location: /login');
         exit;
     }
 };
 
-$router->get('/', static function () use ($render): void {
+$router->get('/', static function () use ($render) {
     header('Location: /dashboard');
 });
 
-$router->get('/login', static fn () => $render('login', ['title' => 'Вход', 'showSidebar' => false]));
-$router->get('/register', static fn () => $render('register', ['title' => 'Регистрация', 'showSidebar' => false]));
+$router->get('/login', static function () use ($render) {
+    $render('login', ['title' => 'Вход', 'showSidebar' => false]);
+});
+$router->get('/register', static function () use ($render) {
+    $render('register', ['title' => 'Регистрация', 'showSidebar' => false]);
+});
 
-$router->get('/dashboard', static function () use ($render, $authRequired): void {
+$router->get('/dashboard', static function () use ($render, $authRequired) {
     $authRequired();
     $render('dashboard', ['title' => 'Дашборд', 'page' => 'dashboard']);
 });
-$router->get('/transactions', static function () use ($render, $authRequired): void {
+$router->get('/transactions', static function () use ($render, $authRequired) {
     $authRequired();
     $render('transactions', ['title' => 'Операции', 'page' => 'transactions']);
 });
-$router->get('/accounts', static function () use ($render, $authRequired): void {
+$router->get('/accounts', static function () use ($render, $authRequired) {
     $authRequired();
     $render('accounts', ['title' => 'Счета', 'page' => 'accounts']);
 });
-$router->get('/categories', static function () use ($render, $authRequired): void {
+$router->get('/categories', static function () use ($render, $authRequired) {
     $authRequired();
     $render('categories', ['title' => 'Категории', 'page' => 'categories']);
 });
-$router->get('/budgets', static function () use ($render, $authRequired): void {
+$router->get('/budgets', static function () use ($render, $authRequired) {
     $authRequired();
     $render('budgets', ['title' => 'Бюджеты', 'page' => 'budgets']);
 });
-$router->get('/goals', static function () use ($render, $authRequired): void {
+$router->get('/goals', static function () use ($render, $authRequired) {
     $authRequired();
     $render('goals', ['title' => 'Цели', 'page' => 'goals']);
 });
-$router->get('/reports', static function () use ($render, $authRequired): void {
+$router->get('/reports', static function () use ($render, $authRequired) {
     $authRequired();
     $render('reports', ['title' => 'Отчёты', 'page' => 'reports']);
 });
@@ -131,7 +138,7 @@ $router->get('/api/reports/summary', [new ReportsController(), 'summary']);
 $router->get('/api/reports/expense-by-category', [new ReportsController(), 'expenseByCategory']);
 $router->get('/api/reports/dynamics', [new ReportsController(), 'dynamics']);
 
-$router->set404(static function () use ($render): void {
+$router->set404(static function () use ($render) {
     http_response_code(404);
     $render('dashboard', ['title' => 'Страница не найдена', 'page' => 'dashboard']);
 });

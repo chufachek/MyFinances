@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,9 +9,9 @@ use App\Services\Response;
 
 class CategoriesController
 {
-    public function index(): void
+    public function index()
     {
-        $type = $_GET['type'] ?? null;
+        $type = isset($_GET['type']) ? $_GET['type'] : null;
         $pdo = Database::connection();
         $query = 'SELECT * FROM categories WHERE user_id = :user_id';
         $params = ['user_id' => Auth::userId()];
@@ -27,11 +25,11 @@ class CategoriesController
         Response::json(['categories' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $type = (string)($data['category_type'] ?? 'expense');
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $type = (string)(isset($data['category_type']) ? $data['category_type'] : 'expense');
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
 
         if ($name === '') {
@@ -50,11 +48,11 @@ class CategoriesController
         Response::json(['success' => true]);
     }
 
-    public function update(string $id): void
+    public function update($id)
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $type = (string)($data['category_type'] ?? 'expense');
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $type = (string)(isset($data['category_type']) ? $data['category_type'] : 'expense');
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
 
         $pdo = Database::connection();
@@ -69,7 +67,7 @@ class CategoriesController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE categories SET is_active = 0 WHERE category_id = :id AND user_id = :user_id');

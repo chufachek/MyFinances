@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
 use PDO;
@@ -9,9 +7,9 @@ use PDOException;
 
 class Database
 {
-    private static ?PDO $instance = null;
+    private static $instance = null;
 
-    public static function connection(): PDO
+    public static function connection()
     {
         if (self::$instance) {
             return self::$instance;

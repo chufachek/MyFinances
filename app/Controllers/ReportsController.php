@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -10,11 +8,11 @@ use App\Services\Response;
 
 class ReportsController
 {
-    public function summary(): void
+    public function summary()
     {
         $userId = Auth::userId();
-        $dateFrom = $_GET['dateFrom'] ?? date('Y-m-01');
-        $dateTo = $_GET['dateTo'] ?? date('Y-m-t');
+        $dateFrom = isset($_GET['dateFrom']) ? $_GET['dateFrom'] : date('Y-m-01');
+        $dateTo = isset($_GET['dateTo']) ? $_GET['dateTo'] : date('Y-m-t');
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
@@ -46,16 +44,16 @@ class ReportsController
         $balance = $balanceStmt->fetch();
 
         Response::json([
-            'income' => (float) ($totals['total_income'] ?? 0),
-            'expense' => (float) ($totals['total_expense'] ?? 0),
-            'net' => (float) ($totals['total_income'] ?? 0) - (float) ($totals['total_expense'] ?? 0),
-            'balance' => (float) ($balance['total_balance'] ?? 0),
+            'income' => (float) (isset($totals['total_income']) ? $totals['total_income'] : 0),
+            'expense' => (float) (isset($totals['total_expense']) ? $totals['total_expense'] : 0),
+            'net' => (float) (isset($totals['total_income']) ? $totals['total_income'] : 0) - (float) (isset($totals['total_expense']) ? $totals['total_expense'] : 0),
+            'balance' => (float) (isset($balance['total_balance']) ? $balance['total_balance'] : 0),
         ]);
     }
 
-    public function expenseByCategory(): void
+    public function expenseByCategory()
     {
-        $month = $_GET['month'] ?? date('Y-m');
+        $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'SELECT c.name, SUM(t.amount) AS total
@@ -72,12 +70,12 @@ class ReportsController
         Response::json(['items' => $stmt->fetchAll()]);
     }
 
-    public function dynamics(): void
+    public function dynamics()
     {
-        $groupBy = $_GET['groupBy'] ?? 'day';
-        $type = $_GET['type'] ?? 'both';
-        $dateFrom = $_GET['dateFrom'] ?? date('Y-m-01');
-        $dateTo = $_GET['dateTo'] ?? date('Y-m-t');
+        $groupBy = isset($_GET['groupBy']) ? $_GET['groupBy'] : 'day';
+        $type = isset($_GET['type']) ? $_GET['type'] : 'both';
+        $dateFrom = isset($_GET['dateFrom']) ? $_GET['dateFrom'] : date('Y-m-01');
+        $dateTo = isset($_GET['dateTo']) ? $_GET['dateTo'] : date('Y-m-t');
 
         $format = $groupBy === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
@@ -100,8 +98,12 @@ class ReportsController
         $rows = $stmt->fetchAll();
 
         $labels = array_column($rows, 'period');
-        $income = array_map(static fn ($row) => (float) $row['income'], $rows);
-        $expense = array_map(static fn ($row) => (float) $row['expense'], $rows);
+        $income = array_map(static function ($row) {
+            return (float) $row['income'];
+        }, $rows);
+        $expense = array_map(static function ($row) {
+            return (float) $row['expense'];
+        }, $rows);
 
         $data = [
             'labels' => $labels,

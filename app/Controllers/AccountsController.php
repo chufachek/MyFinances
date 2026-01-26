@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,7 +9,7 @@ use App\Services\Response;
 
 class AccountsController
 {
-    public function index(): void
+    public function index()
     {
         $pdo = Database::connection();
         $userId = Auth::userId();
@@ -31,13 +29,13 @@ class AccountsController
         Response::json(['accounts' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $type = (string)($data['account_type'] ?? 'card');
-        $currency = strtoupper((string)($data['currency_code'] ?? 'RUB'));
-        $balance = (float)($data['initial_balance'] ?? 0);
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $type = (string)(isset($data['account_type']) ? $data['account_type'] : 'card');
+        $currency = strtoupper((string)(isset($data['currency_code']) ? $data['currency_code'] : 'RUB'));
+        $balance = (float)(isset($data['initial_balance']) ? $data['initial_balance'] : 0);
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
 
         if ($name === '') {
@@ -59,13 +57,13 @@ class AccountsController
         Response::json(['success' => true]);
     }
 
-    public function update(string $id): void
+    public function update($id)
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $type = (string)($data['account_type'] ?? 'card');
-        $currency = strtoupper((string)($data['currency_code'] ?? 'RUB'));
-        $balance = (float)($data['initial_balance'] ?? 0);
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $type = (string)(isset($data['account_type']) ? $data['account_type'] : 'card');
+        $currency = strtoupper((string)(isset($data['currency_code']) ? $data['currency_code'] : 'RUB'));
+        $balance = (float)(isset($data['initial_balance']) ? $data['initial_balance'] : 0);
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
 
         $pdo = Database::connection();
@@ -83,7 +81,7 @@ class AccountsController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE accounts SET is_active = 0 WHERE account_id = :id AND user_id = :user_id');

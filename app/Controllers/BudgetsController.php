@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,9 +9,9 @@ use App\Services\Response;
 
 class BudgetsController
 {
-    public function index(): void
+    public function index()
     {
-        $month = $_GET['month'] ?? date('Y-m');
+        $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'SELECT b.*, c.name AS category_name,
@@ -30,12 +28,12 @@ class BudgetsController
         Response::json(['budgets' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
-        $categoryId = (int)($data['category_id'] ?? 0);
-        $month = (string)($data['period_month'] ?? '');
-        $limit = (float)($data['limit_amount'] ?? 0);
+        $categoryId = (int)(isset($data['category_id']) ? $data['category_id'] : 0);
+        $month = (string)(isset($data['period_month']) ? $data['period_month'] : '');
+        $limit = (float)(isset($data['limit_amount']) ? $data['limit_amount'] : 0);
 
         if ($categoryId <= 0 || $month === '' || $limit <= 0) {
             Response::json(['error' => 'Заполните данные бюджета'], 422);
@@ -53,12 +51,12 @@ class BudgetsController
         Response::json(['success' => true]);
     }
 
-    public function update(string $id): void
+    public function update($id)
     {
         $data = Request::data();
-        $categoryId = (int)($data['category_id'] ?? 0);
-        $month = (string)($data['period_month'] ?? '');
-        $limit = (float)($data['limit_amount'] ?? 0);
+        $categoryId = (int)(isset($data['category_id']) ? $data['category_id'] : 0);
+        $month = (string)(isset($data['period_month']) ? $data['period_month'] : '');
+        $limit = (float)(isset($data['limit_amount']) ? $data['limit_amount'] : 0);
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE budgets SET category_id = :category_id, period_month = :month, limit_amount = :amount WHERE budget_id = :id AND user_id = :user_id');
@@ -72,7 +70,7 @@ class BudgetsController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('DELETE FROM budgets WHERE budget_id = :id AND user_id = :user_id');

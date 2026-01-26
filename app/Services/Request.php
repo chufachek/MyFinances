@@ -1,12 +1,10 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
 class Request
 {
-    public static function json(): array
+    public static function json()
     {
         $input = file_get_contents('php://input');
         if (!$input) {
@@ -16,7 +14,7 @@ class Request
         return is_array($data) ? $data : [];
     }
 
-    public static function data(): array
+    public static function data()
     {
         $data = $_POST;
         if (empty($data)) {
