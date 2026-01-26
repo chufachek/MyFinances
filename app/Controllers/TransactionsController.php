@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,7 +9,7 @@ use App\Services\Response;
 
 class TransactionsController
 {
-    public function index(): void
+    public function index()
     {
         $userId = Auth::userId();
         $params = ['user_id' => $userId];
@@ -69,7 +67,7 @@ class TransactionsController
         Response::json(['transactions' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
         $payload = $this->normalize($data);
@@ -99,7 +97,7 @@ class TransactionsController
         Response::json(['success' => true]);
     }
 
-    public function update(string $id): void
+    public function update($id)
     {
         $data = Request::data();
         $payload = $this->normalize($data);
@@ -131,7 +129,7 @@ class TransactionsController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('DELETE FROM transactions WHERE transaction_id = :id AND user_id = :user_id');
@@ -139,16 +137,16 @@ class TransactionsController
         Response::json(['success' => true]);
     }
 
-    private function normalize(array $data): array
+    private function normalize(array $data)
     {
-        $accountId = (int)($data['account_id'] ?? 0);
+        $accountId = (int)(isset($data['account_id']) ? $data['account_id'] : 0);
         $categoryId = isset($data['category_id']) && $data['category_id'] !== '' ? (int) $data['category_id'] : null;
-        $txType = (string)($data['tx_type'] ?? 'expense');
-        $amount = (float)($data['amount'] ?? 0);
-        $txDate = (string)($data['tx_date'] ?? '');
+        $txType = (string)(isset($data['tx_type']) ? $data['tx_type'] : 'expense');
+        $amount = (float)(isset($data['amount']) ? $data['amount'] : 0);
+        $txDate = (string)(isset($data['tx_date']) ? $data['tx_date'] : '');
         $txDate = str_replace('T', ' ', $txDate);
-        $note = trim((string)($data['note'] ?? '')) ?: null;
-        $merchantName = trim((string)($data['merchant'] ?? '')) ?: null;
+        $note = trim((string)(isset($data['note']) ? $data['note'] : '')) ?: null;
+        $merchantName = trim((string)(isset($data['merchant']) ? $data['merchant'] : '')) ?: null;
 
         if ($accountId <= 0 || $amount <= 0 || $txDate === '') {
             return ['error' => 'Заполните счёт, сумму и дату операции'];
@@ -179,7 +177,7 @@ class TransactionsController
         ];
     }
 
-    private function resolveMerchantId($pdo, ?string $name): ?int
+    private function resolveMerchantId($pdo, $name)
     {
         if (!$name) {
             return null;

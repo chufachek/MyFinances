@@ -1,24 +1,22 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
 use PDO;
 
 class Auth
 {
-    public static function userId(): ?int
+    public static function userId()
     {
-        return $_SESSION['user_id'] ?? null;
+        return isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
     }
 
-    public static function check(): bool
+    public static function check()
     {
         return self::userId() !== null;
     }
 
-    public static function requireAuth(): void
+    public static function requireAuth()
     {
         if (!self::check()) {
             Response::json(['error' => 'Unauthorized'], 401);
@@ -26,7 +24,7 @@ class Auth
         }
     }
 
-    public static function login(string $email, string $password): bool
+    public static function login($email, $password)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT user_id, password_hash, full_name, email FROM users WHERE email = :email AND status = "active"');
@@ -40,7 +38,7 @@ class Auth
         return true;
     }
 
-    public static function register(string $email, string $password, ?string $fullName = null): array
+    public static function register($email, $password, $fullName = null)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT user_id FROM users WHERE email = :email');
@@ -62,13 +60,13 @@ class Auth
         return ['success' => true, 'user_id' => $userId];
     }
 
-    public static function logout(): void
+    public static function logout()
     {
         session_destroy();
         $_SESSION = [];
     }
 
-    public static function user(PDO $pdo): ?array
+    public static function user(PDO $pdo)
     {
         $userId = self::userId();
         if (!$userId) {

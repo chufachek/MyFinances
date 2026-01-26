@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title ?? 'МоиФинансы', ENT_QUOTES) ?></title>
+    <title><?= htmlspecialchars(isset($title) ? $title : 'МоиФинансы', ENT_QUOTES) ?></title>
     <link rel="stylesheet" href="/assets/styles/app.css">
 </head>
-<body data-page="<?= htmlspecialchars($page ?? '', ENT_QUOTES) ?>">
+<body data-page="<?= htmlspecialchars(isset($page) ? $page : '', ENT_QUOTES) ?>">
     <div class="app-shell">
         <?php if (!isset($showSidebar) || $showSidebar !== false) : ?>
             <?php require __DIR__ . '/partials/menu.php'; ?>

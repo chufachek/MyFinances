@@ -4,17 +4,17 @@ namespace Bramus\Router;
 
 class Router
 {
-    private array $routes = [];
-    private array $before = [];
+    private $routes = [];
+    private $before = [];
     private $notFound;
-    private string $basePath = '';
+    private $basePath = '';
 
-    public function setBasePath(string $basePath): void
+    public function setBasePath($basePath)
     {
         $this->basePath = rtrim($basePath, '/');
     }
 
-    public function before(string $methods, string $pattern, callable $handler): void
+    public function before($methods, $pattern, callable $handler)
     {
         $this->before[] = [
             'methods' => $this->parseMethods($methods),
@@ -23,27 +23,27 @@ class Router
         ];
     }
 
-    public function get(string $pattern, callable $handler): void
+    public function get($pattern, callable $handler)
     {
         $this->map('GET', $pattern, $handler);
     }
 
-    public function post(string $pattern, callable $handler): void
+    public function post($pattern, callable $handler)
     {
         $this->map('POST', $pattern, $handler);
     }
 
-    public function put(string $pattern, callable $handler): void
+    public function put($pattern, callable $handler)
     {
         $this->map('PUT', $pattern, $handler);
     }
 
-    public function delete(string $pattern, callable $handler): void
+    public function delete($pattern, callable $handler)
     {
         $this->map('DELETE', $pattern, $handler);
     }
 
-    public function map(string $methods, string $pattern, callable $handler): void
+    public function map($methods, $pattern, callable $handler)
     {
         $this->routes[] = [
             'methods' => $this->parseMethods($methods),
@@ -52,16 +52,20 @@ class Router
         ];
     }
 
-    public function set404(callable $handler): void
+    public function set404(callable $handler)
     {
         $this->notFound = $handler;
     }
 
-    public function run(): void
+    public function run()
     {
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
-        if ($this->basePath !== '' && str_starts_with($uri, $this->basePath)) {
+        $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
+        $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
+        $uri = parse_url($requestUri, PHP_URL_PATH);
+        if ($uri === null || $uri === false) {
+            $uri = '/';
+        }
+        if ($this->basePath !== '' && strpos($uri, $this->basePath) === 0) {
             $uri = substr($uri, strlen($this->basePath));
         }
         $uri = '/' . ltrim($uri, '/');
@@ -98,12 +102,12 @@ class Router
         echo 'Not Found';
     }
 
-    private function parseMethods(string $methods): array
+    private function parseMethods($methods)
     {
         return array_map('trim', explode('|', $methods));
     }
 
-    private function patternMatches(string $pattern, string $uri, bool $returnParams = false): array|bool
+    private function patternMatches($pattern, $uri, $returnParams = false)
     {
         $regex = preg_replace('#\{([^/]+)\}#', '(?P<$1>[^/]+)', $pattern);
         $regex = '#^' . $regex . '$#';

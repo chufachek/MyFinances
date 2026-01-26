@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,7 +9,7 @@ use App\Services\Response;
 
 class TransfersController
 {
-    public function index(): void
+    public function index()
     {
         $userId = Auth::userId();
         $params = ['user_id' => $userId];
@@ -41,16 +39,16 @@ class TransfersController
         Response::json(['transfers' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
-        $from = (int)($data['from_account_id'] ?? 0);
-        $to = (int)($data['to_account_id'] ?? 0);
-        $amount = (float)($data['amount'] ?? 0);
-        $fee = (float)($data['fee'] ?? 0);
-        $txDate = (string)($data['tx_date'] ?? '');
+        $from = (int)(isset($data['from_account_id']) ? $data['from_account_id'] : 0);
+        $to = (int)(isset($data['to_account_id']) ? $data['to_account_id'] : 0);
+        $amount = (float)(isset($data['amount']) ? $data['amount'] : 0);
+        $fee = (float)(isset($data['fee']) ? $data['fee'] : 0);
+        $txDate = (string)(isset($data['tx_date']) ? $data['tx_date'] : '');
         $txDate = str_replace('T', ' ', $txDate);
-        $note = trim((string)($data['note'] ?? '')) ?: null;
+        $note = trim((string)(isset($data['note']) ? $data['note'] : '')) ?: null;
 
         if ($from <= 0 || $to <= 0 || $amount <= 0 || $txDate === '') {
             Response::json(['error' => 'Заполните все поля перевода'], 422);
@@ -79,7 +77,7 @@ class TransfersController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('DELETE FROM transfers WHERE transfer_id = :id AND user_id = :user_id');

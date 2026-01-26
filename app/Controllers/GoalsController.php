@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Controllers;
 
 use App\Services\Auth;
@@ -11,7 +9,7 @@ use App\Services\Response;
 
 class GoalsController
 {
-    public function index(): void
+    public function index()
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM goals WHERE user_id = :user_id ORDER BY due_date ASC');
@@ -19,14 +17,14 @@ class GoalsController
         Response::json(['goals' => $stmt->fetchAll()]);
     }
 
-    public function store(): void
+    public function store()
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $target = (float)($data['target_amount'] ?? 0);
-        $current = (float)($data['current_amount'] ?? 0);
-        $due = $data['due_date'] ?? null;
-        $status = $data['status'] ?? 'active';
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $target = (float)(isset($data['target_amount']) ? $data['target_amount'] : 0);
+        $current = (float)(isset($data['current_amount']) ? $data['current_amount'] : 0);
+        $due = isset($data['due_date']) ? $data['due_date'] : null;
+        $status = isset($data['status']) ? $data['status'] : 'active';
 
         if ($name === '' || $target <= 0) {
             Response::json(['error' => 'Заполните название и сумму цели'], 422);
@@ -46,14 +44,14 @@ class GoalsController
         Response::json(['success' => true]);
     }
 
-    public function update(string $id): void
+    public function update($id)
     {
         $data = Request::data();
-        $name = trim((string)($data['name'] ?? ''));
-        $target = (float)($data['target_amount'] ?? 0);
-        $current = (float)($data['current_amount'] ?? 0);
-        $due = $data['due_date'] ?? null;
-        $status = $data['status'] ?? 'active';
+        $name = trim((string)(isset($data['name']) ? $data['name'] : ''));
+        $target = (float)(isset($data['target_amount']) ? $data['target_amount'] : 0);
+        $current = (float)(isset($data['current_amount']) ? $data['current_amount'] : 0);
+        $due = isset($data['due_date']) ? $data['due_date'] : null;
+        $status = isset($data['status']) ? $data['status'] : 'active';
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE goals SET name = :name, target_amount = :target, current_amount = :current, due_date = :due, status = :status WHERE goal_id = :id AND user_id = :user_id');
@@ -69,7 +67,7 @@ class GoalsController
         Response::json(['success' => true]);
     }
 
-    public function delete(string $id): void
+    public function delete($id)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('DELETE FROM goals WHERE goal_id = :id AND user_id = :user_id');
