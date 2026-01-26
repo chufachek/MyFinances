@@ -46,54 +46,11 @@
     <div class="panel">
         <div class="panel__header">
             <h3>Список операций</h3>
-            <button class="btn btn-primary" id="transactions-add">Добавить операцию</button>
+            <button class="btn btn-primary" id="transactions-add" data-action="open-quick" data-type="expense">
+                Добавить операцию
+            </button>
         </div>
         <div id="transactions-table" class="table"></div>
-    </div>
-
-    <div class="panel">
-        <div class="panel__header">
-            <h3>Форма операции</h3>
-            <span class="text-muted" id="transactions-form-title">Новая операция</span>
-        </div>
-        <form id="transactions-form" class="grid grid-4">
-            <input type="hidden" name="transaction_id" />
-            <label class="field">
-                <span>Тип</span>
-                <select name="tx_type" id="tx-type">
-                    <option value="income">Доход</option>
-                    <option value="expense">Расход</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Счет</span>
-                <select name="account_id" id="tx-account"></select>
-            </label>
-            <label class="field">
-                <span>Категория</span>
-                <select name="category_id" id="tx-category"></select>
-            </label>
-            <label class="field">
-                <span>Сумма</span>
-                <input type="number" step="0.01" name="amount" required>
-            </label>
-            <label class="field">
-                <span>Дата</span>
-                <input type="datetime-local" name="tx_date" required>
-            </label>
-            <label class="field">
-                <span>Магазин</span>
-                <input type="text" name="merchant" placeholder="Например, Пятёрочка">
-            </label>
-            <label class="field field--full">
-                <span>Комментарий</span>
-                <input type="text" name="note" placeholder="Комментарий">
-            </label>
-            <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Сохранить</button>
-                <button class="btn btn-outline" type="button" id="transactions-cancel">Очистить</button>
-            </div>
-        </form>
     </div>
 
     <div class="panel">
