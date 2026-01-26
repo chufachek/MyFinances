@@ -229,6 +229,8 @@ a {
     border: 1px solid var(--gray-200);
     font-size: 14px;
     background: var(--white);
+    min-height: 40px;
+    line-height: 1.2;
 }
 
 .field input:focus,
