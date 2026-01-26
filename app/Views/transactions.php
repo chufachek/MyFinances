@@ -7,6 +7,7 @@
         <div class="page__actions">
             <button class="btn btn-primary" id="add-income-btn">+ Доход</button>
             <button class="btn btn-secondary" id="add-expense-btn">+ Расход</button>
+            <button class="btn btn-outline" data-action="open-transfer">+ Перевод</button>
         </div>
     </header>
 
@@ -58,35 +59,6 @@
         <div class="panel__header">
             <h3>Переводы между счетами</h3>
         </div>
-        <form id="transfer-form" class="grid grid-4">
-            <label class="field">
-                <span>Счёт списания</span>
-                <select name="from_account_id" id="transfer-from"></select>
-            </label>
-            <label class="field">
-                <span>Счёт получения</span>
-                <select name="to_account_id" id="transfer-to"></select>
-            </label>
-            <label class="field">
-                <span>Сумма</span>
-                <input type="number" step="0.01" name="amount" required>
-            </label>
-            <label class="field">
-                <span>Комиссия</span>
-                <input type="number" step="0.01" name="fee" value="0">
-            </label>
-            <label class="field">
-                <span>Дата</span>
-                <input type="datetime-local" name="tx_date" required>
-            </label>
-            <label class="field field--full">
-                <span>Комментарий</span>
-                <input type="text" name="note">
-            </label>
-            <div class="form-actions">
-                <button class="btn btn-secondary" type="submit">Создать перевод</button>
-            </div>
-        </form>
         <div id="transfers-table" class="table"></div>
     </div>
 

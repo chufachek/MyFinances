@@ -188,6 +188,15 @@ const closeAllModals = () => {
 };
 
 const formatDateInput = (date) => date.toISOString().slice(0, 10);
+const selectFirstOption = (select) => {
+    if (!select) {
+        return;
+    }
+    const option = Array.from(select.options).find((opt) => opt.value);
+    if (option) {
+        select.value = option.value;
+    }
+};
 
 document.addEventListener('click', (event) => {
     const target = event.target;
@@ -243,6 +252,7 @@ const initTransactionModal = async () => {
             const accounts = await getJson('/api/accounts');
             const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
             fillSelect(accountSelect, accountOptions, 'Выберите');
+            selectFirstOption(accountSelect);
             accountsReady = true;
         } catch (error) {
             showError('Не удалось загрузить список счетов.');
@@ -279,6 +289,8 @@ const initTransactionModal = async () => {
         fillSelect(categorySelect, options, 'Без категории');
         if (selectedValue) {
             categorySelect.value = selectedValue;
+        } else {
+            selectFirstOption(categorySelect);
         }
     };
 
@@ -340,6 +352,77 @@ const initTransactionModal = async () => {
     return { open, setOnSaved };
 };
 
+const initTransferModal = ({ onSaved } = {}) => {
+    const modal = byId('transfer-modal');
+    const form = byId('transfer-quick-form');
+    if (!modal || !form) {
+        return null;
+    }
+
+    const fromSelect = byId('transfer-quick-from');
+    const toSelect = byId('transfer-quick-to');
+    const dateInput = byId('transfer-quick-date');
+
+    let accountsCache = null;
+
+    const loadAccounts = async () => {
+        if (accountsCache) {
+            return accountsCache;
+        }
+        try {
+            const { accounts } = await getJson('/api/accounts');
+            accountsCache = accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
+        } catch (error) {
+            showError('Не удалось загрузить список счетов.');
+            accountsCache = [];
+        }
+        return accountsCache;
+    };
+
+    const setDefaults = async () => {
+        form.reset();
+        dateInput.value = formatDateTimeLocal(new Date());
+        const accounts = await loadAccounts();
+        fillSelect(fromSelect, accounts, 'Выберите');
+        fillSelect(toSelect, accounts, 'Выберите');
+
+        if (accounts.length > 0) {
+            fromSelect.value = accounts[0].value;
+        }
+        if (accounts.length > 1) {
+            toSelect.value = accounts[1].value;
+        } else if (accounts.length === 1) {
+            toSelect.value = accounts[0].value;
+        }
+    };
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = serializeForm(form);
+        if (data.from_account_id === data.to_account_id) {
+            showError('Выберите разные счета для перевода.');
+            return;
+        }
+        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
+        closeModal(modal);
+        if (onSaved) {
+            await onSaved();
+        }
+    });
+
+    document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            await setDefaults();
+            openModal(modal);
+        });
+    });
+
+    return { open: async () => {
+        await setDefaults();
+        openModal(modal);
+    } };
+};
+
 // Инициализация модалок добавления доходов и расходов.
 const initIncomeExpenseModals = async ({ onSaved } = {}) => {
     const configs = [
@@ -394,8 +477,10 @@ const initIncomeExpenseModals = async ({ onSaved } = {}) => {
             dateInput.value = formatDateInput(new Date());
             const accounts = await loadAccounts();
             fillSelect(accountSelect, accounts, 'Выберите');
+            selectFirstOption(accountSelect);
             const categories = await loadCategories(config.type);
             fillSelect(categorySelect, categories, 'Без категории');
+            selectFirstOption(categorySelect);
         };
 
         // Мини-калькулятор для быстрого изменения суммы.
@@ -491,9 +576,6 @@ const initDashboard = async () => {
     const categoryCtx = byId('dashboard-category');
     const monthlyCtx = byId('dashboard-monthly');
     const categoryList = byId('dashboard-category-list');
-    const transferModal = byId('transfer-modal');
-    const transferForm = byId('transfer-quick-form');
-
     let lineChart;
     let categoryChart;
     let monthlyChart;
@@ -709,42 +791,7 @@ const initDashboard = async () => {
         transactionModal.setOnSaved(loadDashboard);
     }
     await initIncomeExpenseModals({ onSaved: loadDashboard });
-
-    const initQuickActions = async () => {
-        if (!transferForm) {
-            return;
-        }
-
-        document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                transferForm.reset();
-                byId('transfer-quick-date').value = formatDateTimeLocal(new Date());
-                openModal(transferModal);
-            });
-        });
-
-        transferForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const data = serializeForm(event.target);
-            await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
-            closeModal(transferModal);
-            await loadDashboard();
-        });
-
-        try {
-            const accounts = await getJson('/api/accounts');
-            const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
-
-            fillSelect(byId('transfer-quick-from'), accountOptions, 'Выберите');
-            fillSelect(byId('transfer-quick-to'), accountOptions, 'Выберите');
-        } catch (error) {
-            showError('Не удалось загрузить список счетов.');
-            fillSelect(byId('transfer-quick-from'), [], 'Выберите');
-            fillSelect(byId('transfer-quick-to'), [], 'Выберите');
-        }
-    };
-
-    await initQuickActions();
+    initTransferModal({ onSaved: loadDashboard });
     await loadDashboard();
 };
 
@@ -916,8 +963,6 @@ const initTransactions = async () => {
     const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
 
     fillSelect(byId('filter-account'), accountOptions, 'Все');
-    fillSelect(byId('transfer-from'), accountOptions, 'Выберите');
-    fillSelect(byId('transfer-to'), accountOptions, 'Выберите');
 
     const loadCategories = async (type) => {
         const url = type ? `/api/categories?type=${type}` : '/api/categories';
@@ -1022,14 +1067,7 @@ const initTransactions = async () => {
         transactionModal.setOnSaved(loadTransactions);
     }
     await initIncomeExpenseModals({ onSaved: loadTransactions });
-
-    byId('transfer-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const data = serializeForm(event.target);
-        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
-        event.target.reset();
-        await loadTransfers();
-    });
+    initTransferModal({ onSaved: loadTransfers });
 
     await loadTransactions();
     await loadTransfers();
