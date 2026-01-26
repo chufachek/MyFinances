@@ -73,7 +73,7 @@ const renderTable = (container, headers, rows) => {
         const rowEl = document.createElement('div');
         rowEl.className = 'table__row table__row--empty';
         const cellEl = document.createElement('div');
-        cellEl.textContent = 'Нет данных';
+        cellEl.textContent = getRandomEmptyMessage();
         rowEl.appendChild(cellEl);
         table.appendChild(rowEl);
     } else {
@@ -98,6 +98,24 @@ const renderTable = (container, headers, rows) => {
 };
 
 const serializeForm = (form) => Object.fromEntries(new FormData(form).entries());
+
+const emptyDataMessages = [
+    'Данных нет.',
+    'Данные появятся, когда вы начнете копить и тратить!',
+    'Пока пусто — добавьте доходы и расходы.',
+    'Нет записей, но это легко исправить.',
+    'Добавьте первую операцию, чтобы увидеть статистику.',
+    'Пока без данных — начните вести учет.',
+    'Здесь будут ваши расходы и доходы.',
+    'Добавьте несколько операций для первых результатов.',
+    'Ничего не найдено — самое время начать.',
+    'Пусто, но скоро появятся ваши данные.',
+];
+
+const getRandomEmptyMessage = () => {
+    const index = Math.floor(Math.random() * emptyDataMessages.length);
+    return emptyDataMessages[index];
+};
 
 let chartLibraryPromise;
 const ensureChart = () => {
@@ -124,7 +142,37 @@ const ensureChart = () => {
     return chartLibraryPromise;
 };
 
+const setSelectValue = (select, value) => {
+    if (!select) {
+        return;
+    }
+    select.value = value ?? '';
+    if (select._choices) {
+        select._choices.setChoiceByValue(String(select.value));
+    }
+};
+
 const fillSelect = (select, options, placeholder = 'Все') => {
+    if (select?._choices) {
+        const choices = [];
+        if (placeholder) {
+            choices.push({
+                value: '',
+                label: placeholder,
+                selected: true,
+            });
+        }
+        options.forEach((opt) => {
+            choices.push({
+                value: opt.value,
+                label: opt.label,
+            });
+        });
+        select._choices.clearChoices();
+        select._choices.setChoices(choices, 'value', 'label', true);
+        setSelectValue(select, select.value);
+        return;
+    }
     select.innerHTML = '';
     if (placeholder) {
         const empty = document.createElement('option');
@@ -144,7 +192,11 @@ const setFormValues = (form, values) => {
     Object.entries(values).forEach(([key, value]) => {
         const field = form.querySelector(`[name="${key}"]`);
         if (field) {
-            field.value = value ?? '';
+            if (field.tagName === 'SELECT') {
+                setSelectValue(field, value);
+            } else {
+                field.value = value ?? '';
+            }
         }
     });
 };
@@ -215,7 +267,52 @@ const selectFirstOption = (select) => {
     }
     const option = Array.from(select.options).find((opt) => opt.value);
     if (option) {
-        select.value = option.value;
+        setSelectValue(select, option.value);
+    }
+};
+
+const initSelectEnhancements = () => {
+    if (!window.Choices) {
+        return;
+    }
+    document.querySelectorAll('select').forEach((select) => {
+        if (select.dataset.choicesInitialized) {
+            return;
+        }
+        const instance = new window.Choices(select, {
+            searchEnabled: false,
+            itemSelectText: '',
+            shouldSort: false,
+            allowHTML: false,
+        });
+        select.dataset.choicesInitialized = 'true';
+        select._choices = instance;
+    });
+};
+
+const renderChartEmptyState = (canvas, isEmpty) => {
+    if (!canvas) {
+        return;
+    }
+    const container = canvas.parentElement;
+    if (!container) {
+        return;
+    }
+    let emptyEl = container.querySelector(`.chart-empty[data-for="${canvas.id}"]`);
+    if (!emptyEl) {
+        emptyEl = document.createElement('p');
+        emptyEl.className = 'text-muted chart-empty';
+        emptyEl.dataset.for = canvas.id;
+        canvas.insertAdjacentElement('afterend', emptyEl);
+    }
+    if (isEmpty) {
+        canvas.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = getRandomEmptyMessage();
+    } else {
+        canvas.style.display = '';
+        emptyEl.style.display = 'none';
+        emptyEl.textContent = '';
     }
 };
 
@@ -309,7 +406,7 @@ const initTransactionModal = async () => {
         const options = await loadCategories(type);
         fillSelect(categorySelect, options, 'Без категории');
         if (selectedValue) {
-            categorySelect.value = selectedValue;
+            setSelectValue(categorySelect, selectedValue);
         } else {
             selectFirstOption(categorySelect);
         }
@@ -320,7 +417,7 @@ const initTransactionModal = async () => {
         form.reset();
         const isEdit = Boolean(transaction);
         const resolvedType = type || transaction?.tx_type || typeSelect.value || 'expense';
-        typeSelect.value = resolvedType;
+        setSelectValue(typeSelect, resolvedType);
         title.textContent = getTitle(resolvedType, isEdit);
         transactionId.value = transaction?.transaction_id ?? '';
         dateInput.value = transaction?.tx_date ? normalizeDateTime(transaction.tx_date) : formatDateTimeLocal(new Date());
@@ -335,7 +432,7 @@ const initTransactionModal = async () => {
                 merchant: transaction.merchant_name,
             });
             if (transaction.category_id) {
-                categorySelect.value = transaction.category_id;
+                setSelectValue(categorySelect, transaction.category_id);
             }
         }
 
@@ -408,12 +505,12 @@ const initTransferModal = ({ onSaved } = {}) => {
         fillSelect(toSelect, accounts, 'Выберите');
 
         if (accounts.length > 0) {
-            fromSelect.value = accounts[0].value;
+            setSelectValue(fromSelect, accounts[0].value);
         }
         if (accounts.length > 1) {
-            toSelect.value = accounts[1].value;
+            setSelectValue(toSelect, accounts[1].value);
         } else if (accounts.length === 1) {
-            toSelect.value = accounts[0].value;
+            setSelectValue(toSelect, accounts[0].value);
         }
     };
 
@@ -663,7 +760,7 @@ const initDashboard = async () => {
             if (categoryData.items.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
-                empty.textContent = 'Нет данных';
+                empty.textContent = getRandomEmptyMessage();
                 budgetList.appendChild(empty);
             } else {
                 categoryData.items.slice(0, 3).forEach((item) => {
@@ -1167,8 +1264,13 @@ const initReports = async () => {
 
         const labels = pie.items.map((item) => item.name);
         const values = pie.items.map((item) => item.total);
+        const pieIsEmpty = pie.items.length === 0;
 
-        if (chartLib && pieCtx) {
+        if (pieChart && pieIsEmpty) {
+            pieChart.destroy();
+            pieChart = null;
+        }
+        if (chartLib && pieCtx && !pieIsEmpty) {
             if (pieChart) {
                 pieChart.destroy();
             }
@@ -1185,6 +1287,7 @@ const initReports = async () => {
                 },
             });
         }
+        renderChartEmptyState(pieCtx, pieIsEmpty);
 
         renderTable(
             table,
@@ -1196,7 +1299,12 @@ const initReports = async () => {
             })
         );
 
-        if (chartLib && lineCtx) {
+        const lineIsEmpty = line.labels.length === 0;
+        if (lineChart && lineIsEmpty) {
+            lineChart.destroy();
+            lineChart = null;
+        }
+        if (chartLib && lineCtx && !lineIsEmpty) {
             if (lineChart) {
                 lineChart.destroy();
             }
@@ -1221,6 +1329,7 @@ const initReports = async () => {
                 },
             });
         }
+        renderChartEmptyState(lineCtx, lineIsEmpty);
     };
 
     filterForm.addEventListener('change', load);
@@ -1232,6 +1341,7 @@ const page = document.body.dataset.page;
 
 setupLogout();
 initAuthForms();
+initSelectEnhancements();
 
 if (page === 'dashboard') {
     initDashboard().catch(console.error);
