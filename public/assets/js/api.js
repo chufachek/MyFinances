@@ -10,7 +10,14 @@ export async function apiRequest(url, options = {}) {
 
     if (!response.ok) {
         const message = await response.text();
-        throw new Error(message || 'Network response was not ok');
+        let errorMessage = message || 'Network response was not ok';
+        try {
+            const data = JSON.parse(message);
+            errorMessage = data.error || data.message || errorMessage;
+        } catch (error) {
+            // keep original message
+        }
+        throw new Error(errorMessage);
     }
 
     const text = await response.text();
