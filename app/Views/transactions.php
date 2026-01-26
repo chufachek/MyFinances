@@ -90,107 +90,121 @@
         <div id="transfers-table" class="table"></div>
     </div>
 
-    <div class="modal" id="income-modal" aria-hidden="true">
-        <div class="modal__backdrop" data-action="close-modal"></div>
-        <div class="modal__dialog">
-            <div class="modal__header">
-                <div>
-                    <p class="text-muted">Операции</p>
-                    <h3>Добавить доход</h3>
+    <div class="modal fade" id="income-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="text-muted mb-1">Операции</p>
+                        <h3 class="modal-title fs-5">Добавить доход</h3>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                 </div>
-                <button class="btn btn-outline btn-sm" type="button" data-action="close-modal">Закрыть</button>
-            </div>
-            <form class="grid grid-4 transaction-form" data-tx-type="income">
-                <input type="hidden" name="tx_type" value="income">
-                <label class="field">
-                    <span>Тип</span>
-                    <input type="text" value="Доход" readonly>
-                </label>
-                <label class="field">
-                    <span>Счёт</span>
-                    <select name="account_id" required></select>
-                </label>
-                <label class="field">
-                    <span>Категория</span>
-                    <select name="category_id"></select>
-                </label>
-                <label class="field">
-                    <span>Сумма</span>
-                    <div class="amount-control">
-                        <input class="amount-control__input" type="number" step="0.01" name="amount" required>
-                        <div class="amount-control__buttons">
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                <form class="transaction-form" data-tx-type="income">
+                    <input type="hidden" name="tx_type" value="income">
+                    <div class="modal-body">
+                        <div class="grid grid-4">
+                            <label class="field">
+                                <span>Тип</span>
+                                <input type="text" value="Доход" readonly>
+                            </label>
+                            <label class="field">
+                                <span>Счёт</span>
+                                <select name="account_id" required></select>
+                            </label>
+                            <label class="field">
+                                <span>Категория</span>
+                                <select name="category_id"></select>
+                            </label>
+                            <label class="field">
+                                <span>Сумма</span>
+                                <div class="amount-control">
+                                    <input class="amount-control__input" type="number" step="0.01" name="amount" required>
+                                    <div class="amount-control__buttons">
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="field">
+                                <span>Дата</span>
+                                <input type="date" name="tx_date" required>
+                            </label>
+                            <label class="field field--full">
+                                <span>Комментарий</span>
+                                <input type="text" name="note" placeholder="Например: зарплата">
+                            </label>
                         </div>
                     </div>
-                </label>
-                <label class="field">
-                    <span>Дата</span>
-                    <input type="date" name="tx_date" required>
-                </label>
-                <label class="field field--full">
-                    <span>Комментарий</span>
-                    <input type="text" name="note" placeholder="Например: зарплата">
-                </label>
-                <div class="form-actions">
-                    <button class="btn btn-primary" type="submit">Сохранить</button>
-                    <button class="btn btn-outline" type="button" data-action="close-modal">Отмена</button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" type="submit">Сохранить</button>
+                        <button class="btn btn-outline" type="button" data-bs-dismiss="modal" data-action="close-modal">
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <div class="modal" id="expense-modal" aria-hidden="true">
-        <div class="modal__backdrop" data-action="close-modal"></div>
-        <div class="modal__dialog">
-            <div class="modal__header">
-                <div>
-                    <p class="text-muted">Операции</p>
-                    <h3>Добавить расход</h3>
+    <div class="modal fade" id="expense-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="text-muted mb-1">Операции</p>
+                        <h3 class="modal-title fs-5">Добавить расход</h3>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                 </div>
-                <button class="btn btn-outline btn-sm" type="button" data-action="close-modal">Закрыть</button>
-            </div>
-            <form class="grid grid-4 transaction-form" data-tx-type="expense">
-                <input type="hidden" name="tx_type" value="expense">
-                <label class="field">
-                    <span>Тип</span>
-                    <input type="text" value="Расход" readonly>
-                </label>
-                <label class="field">
-                    <span>Счёт</span>
-                    <select name="account_id" required></select>
-                </label>
-                <label class="field">
-                    <span>Категория</span>
-                    <select name="category_id"></select>
-                </label>
-                <label class="field">
-                    <span>Сумма</span>
-                    <div class="amount-control">
-                        <input class="amount-control__input" type="number" step="0.01" name="amount" required>
-                        <div class="amount-control__buttons">
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
-                            <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                <form class="transaction-form" data-tx-type="expense">
+                    <input type="hidden" name="tx_type" value="expense">
+                    <div class="modal-body">
+                        <div class="grid grid-4">
+                            <label class="field">
+                                <span>Тип</span>
+                                <input type="text" value="Расход" readonly>
+                            </label>
+                            <label class="field">
+                                <span>Счёт</span>
+                                <select name="account_id" required></select>
+                            </label>
+                            <label class="field">
+                                <span>Категория</span>
+                                <select name="category_id"></select>
+                            </label>
+                            <label class="field">
+                                <span>Сумма</span>
+                                <div class="amount-control">
+                                    <input class="amount-control__input" type="number" step="0.01" name="amount" required>
+                                    <div class="amount-control__buttons">
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="100">+100</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-100">-100</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
+                                        <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="field">
+                                <span>Дата</span>
+                                <input type="date" name="tx_date" required>
+                            </label>
+                            <label class="field field--full">
+                                <span>Комментарий</span>
+                                <input type="text" name="note" placeholder="Например: покупки">
+                            </label>
                         </div>
                     </div>
-                </label>
-                <label class="field">
-                    <span>Дата</span>
-                    <input type="date" name="tx_date" required>
-                </label>
-                <label class="field field--full">
-                    <span>Комментарий</span>
-                    <input type="text" name="note" placeholder="Например: покупки">
-                </label>
-                <div class="form-actions">
-                    <button class="btn btn-primary" type="submit">Сохранить</button>
-                    <button class="btn btn-outline" type="button" data-action="close-modal">Отмена</button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" type="submit">Сохранить</button>
+                        <button class="btn btn-outline" type="button" data-bs-dismiss="modal" data-action="close-modal">
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </section>

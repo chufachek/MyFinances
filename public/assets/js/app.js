@@ -6,6 +6,12 @@ const formatCurrency = (value) => {
 };
 
 const byId = (id) => document.getElementById(id);
+const setText = (id, value) => {
+    const el = byId(id);
+    if (el) {
+        el.textContent = value;
+    }
+};
 
 const ensureToastContainer = () => {
     let container = byId('toast-container');
@@ -135,8 +141,23 @@ const showError = (message) => {
     showToast(message, 'error');
 };
 
+const getBootstrapModal = (modal) => {
+    if (!modal) {
+        return null;
+    }
+    if (window.bootstrap?.Modal) {
+        return window.bootstrap.Modal.getOrCreateInstance(modal);
+    }
+    return null;
+};
+
 const openModal = (modal) => {
     if (!modal) {
+        return;
+    }
+    const instance = getBootstrapModal(modal);
+    if (instance) {
+        instance.show();
         return;
     }
     modal.classList.add('is-open');
@@ -147,11 +168,22 @@ const closeModal = (modal) => {
     if (!modal) {
         return;
     }
+    const instance = getBootstrapModal(modal);
+    if (instance) {
+        instance.hide();
+        return;
+    }
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
 };
 
 const closeAllModals = () => {
+    if (window.bootstrap?.Modal) {
+        document.querySelectorAll('.modal.show').forEach((modal) => {
+            window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+        });
+        return;
+    }
     document.querySelectorAll('.modal.is-open').forEach((modal) => closeModal(modal));
 };
 
@@ -485,11 +517,13 @@ const initDashboard = async () => {
                 getJson('/api/transactions?limit=5'),
                 getJson(`/api/reports/expense-by-category?month=${month}`),
                 getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
-                getJson(
-                    `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
-                        endMonth
-                    )}&groupBy=month&type=expense`
-                ),
+                monthlyCtx
+                    ? getJson(
+                          `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
+                              endMonth
+                          )}&groupBy=month&type=expense`
+                      )
+                    : Promise.resolve({ labels: [], expense: [] }),
             ]);
 
         if (
@@ -523,27 +557,25 @@ const initDashboard = async () => {
                 ? monthlyResult.value
                 : { labels: [], expense: [] };
 
-        byId('summary-balance').textContent = formatCurrency(summary.balance);
-        byId('summary-income').textContent = formatCurrency(summary.income);
-        byId('summary-expense').textContent = formatCurrency(summary.expense);
-        byId('summary-net').textContent = formatCurrency(summary.net);
-        byId('summary-net-note').textContent = summary.net >= 0 ? 'профицит' : 'дефицит';
+        setText('summary-balance', formatCurrency(summary.balance));
+        setText('summary-income', formatCurrency(summary.income));
+        setText('summary-expense', formatCurrency(summary.expense));
+        setText('summary-net', formatCurrency(summary.net));
+        setText('summary-net-note', summary.net >= 0 ? 'профицит' : 'дефицит');
+        setText('summary-balance-note', summary.balance >= 0 ? 'по всем счетам' : 'минус');
 
-        byId('summary-average-expense').textContent = formatCurrency(summary.expense / lastDay);
-        byId('summary-average-expense-note').textContent = `в ${lastDay} днях месяца`;
+        setText('summary-average-expense', formatCurrency(summary.expense / lastDay));
+        setText('summary-average-expense-note', `в ${lastDay} днях месяца`);
 
         const topCategory = categoryData.items[0];
-        byId('summary-top-category').textContent = topCategory ? topCategory.name : '—';
-        byId('summary-top-category-amount').textContent = topCategory
-            ? formatCurrency(topCategory.total)
-            : 'нет данных';
+        setText('summary-top-category', topCategory ? topCategory.name : '—');
+        setText('summary-top-category-amount', topCategory ? formatCurrency(topCategory.total) : 'нет данных');
 
         const savingsRate = summary.income > 0 ? (summary.expense / summary.income) * 100 : 0;
-        byId('summary-savings-rate').textContent = `${savingsRate.toFixed(1)}%`;
-        byId('summary-savings-rate-note').textContent =
-            summary.expense <= summary.income ? 'в пределах бюджета' : 'перерасход';
+        setText('summary-savings-rate', `${savingsRate.toFixed(1)}%`);
+        setText('summary-savings-rate-note', summary.expense <= summary.income ? 'в пределах бюджета' : 'перерасход');
 
-        byId('summary-month-expense').textContent = formatCurrency(summary.expense);
+        setText('summary-month-expense', formatCurrency(summary.expense));
 
         const rows = (tx.transactions || []).map((item) => [
             new Date(item.tx_date).toLocaleDateString('ru-RU'),
