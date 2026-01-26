@@ -250,6 +250,9 @@ h3 {
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
 }
 
 .table__row .btn-outline {
