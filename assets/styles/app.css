@@ -233,6 +233,43 @@ a {
     line-height: 1.2;
 }
 
+.choices,
+.field .choices {
+    width: 100%;
+    font-size: 14px;
+}
+
+.choices__inner {
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    box-shadow: none;
+}
+
+.choices__list--single {
+    padding: 0;
+}
+
+.choices__placeholder {
+    opacity: 1;
+    color: var(--gray-500);
+}
+
+.choices.is-focused .choices__inner,
+.choices.is-open .choices__inner {
+    outline: 2px solid var(--green-100);
+    border-color: var(--green-400);
+    box-shadow: 0 0 0 3px rgba(62, 205, 126, 0.18);
+}
+
+.choices[data-type*='select-one']::after {
+    border-color: var(--gray-500) transparent transparent;
+    right: 14px;
+    margin-top: -2px;
+}
+
 .field input:focus,
 .field select:focus {
     outline: 2px solid var(--green-100);
