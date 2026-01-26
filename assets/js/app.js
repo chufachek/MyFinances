@@ -757,7 +757,10 @@ const initDashboard = async () => {
 
         const topCategory = categoryData.items[0];
         setText('summary-top-category', topCategory ? topCategory.name : '—');
-        setText('summary-top-category-amount', topCategory ? formatCurrency(topCategory.total) : 'нет данных');
+        setText(
+            'summary-top-category-amount',
+            topCategory ? formatCurrency(topCategory.total) : getRandomEmptyMessage()
+        );
 
         const savingsRate = summary.income > 0 ? (summary.expense / summary.income) * 100 : 0;
         setText('summary-savings-rate', `${savingsRate.toFixed(1)}%`);
