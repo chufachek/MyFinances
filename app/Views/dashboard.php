@@ -1,13 +1,8 @@
 <section class="page">
     <header class="page__header">
         <div>
-            <h1>Дашборд</h1>
-            <p class="text-muted">Сводка по финансам и быстрые действия.</p>
-        </div>
-        <div class="page__actions">
-            <button class="btn btn-primary" id="add-income-btn">+ Доход</button>
-            <button class="btn btn-secondary" id="add-expense-btn">+ Расход</button>
-            <button class="btn btn-outline" data-action="open-transfer">+ Перевод</button>
+            <h1>Dashboard (главная панель)</h1>
+            <p class="text-muted">Сводка по финансам за выбранный период.</p>
         </div>
     </header>
 
@@ -18,40 +13,39 @@
             <span class="card__trend" id="summary-balance-note">по всем счетам</span>
         </article>
         <article class="card">
-            <p class="card__label">Доходы за месяц</p>
+            <p class="card__label">Доходы за период</p>
             <h2 id="summary-income">—</h2>
             <span class="card__trend positive">+ поступления</span>
         </article>
         <article class="card">
-            <p class="card__label">Расходы за месяц</p>
+            <p class="card__label">Расходы за период</p>
             <h2 id="summary-expense">—</h2>
             <span class="card__trend negative">- траты</span>
         </article>
         <article class="card">
-            <p class="card__label">Разница</p>
+            <p class="card__label">Разница (профит/минус)</p>
             <h2 id="summary-net">—</h2>
             <span class="card__trend" id="summary-net-note">итог периода</span>
         </article>
     </div>
 
-    <section class="dashboard-grid">
-        <article class="panel chart-card">
-            <div class="panel__header">
-                <h3>Динамика доходов и расходов</h3>
-                <span class="text-muted">за текущий месяц</span>
-            </div>
-            <canvas id="dashboard-line" height="240"></canvas>
-        </article>
-        <article class="panel chart-card">
-            <div class="panel__header">
-                <h3>Расходы по категориям</h3>
-                <span class="text-muted">структура месяца</span>
-            </div>
-            <div class="chart-split">
-                <canvas id="dashboard-category" height="220"></canvas>
-                <div id="dashboard-category-list" class="stat-list"></div>
-            </div>
-        </article>
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Быстрые действия</h3>
+        </div>
+        <div class="page__actions">
+            <button class="btn btn-primary" id="add-income-btn">+ Добавить доход</button>
+            <button class="btn btn-secondary" id="add-expense-btn">+ Добавить расход</button>
+            <button class="btn btn-outline" data-action="open-transfer">+ Добавить перевод</button>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Бюджет: топ-3 категории</h3>
+            <span class="text-muted">по превышению или использованию</span>
+        </div>
+        <div id="dashboard-budget-list" class="stat-list"></div>
     </section>
 
     <section class="panel">
