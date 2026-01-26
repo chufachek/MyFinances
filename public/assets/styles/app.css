@@ -279,10 +279,23 @@ h3 {
     transition: border-color var(--transition), box-shadow var(--transition);
 }
 
+.field select,
+.select-inline {
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--gray-500) 50%),
+        linear-gradient(135deg, var(--gray-500) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%;
+    background-size: 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 34px;
+}
+
 .field input:focus,
 .field select:focus {
     outline: 2px solid var(--green-100);
     border-color: var(--green-400);
+    box-shadow: 0 0 0 3px rgba(62, 205, 126, 0.18);
 }
 
 .field--full {
@@ -346,9 +359,16 @@ h3 {
 }
 
 .select-inline {
-    padding: 8px 12px;
+    padding: 8px 34px 8px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--gray-200);
+}
+
+.field select:disabled,
+.select-inline:disabled {
+    color: var(--gray-400);
+    background-color: var(--gray-100);
+    cursor: not-allowed;
 }
 
 .auth {

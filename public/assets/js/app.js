@@ -84,6 +84,19 @@ const renderTable = (container, headers, rows) => {
 
 const serializeForm = (form) => Object.fromEntries(new FormData(form).entries());
 
+let chartLibraryPromise;
+const ensureChart = () => {
+    if (typeof Chart !== 'undefined') {
+        return Promise.resolve(Chart);
+    }
+    if (!chartLibraryPromise) {
+        chartLibraryPromise = import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js')
+            .then((mod) => mod.Chart ?? mod.default ?? mod)
+            .catch(() => null);
+    }
+    return chartLibraryPromise;
+};
+
 const fillSelect = (select, options, placeholder = 'Все') => {
     select.innerHTML = '';
     if (placeholder) {
@@ -212,6 +225,7 @@ const initDashboard = async () => {
     });
 
     const loadDashboard = async () => {
+        const chartLib = await ensureChart();
         const now = new Date();
         const month = now.toISOString().slice(0, 7);
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -221,17 +235,49 @@ const initDashboard = async () => {
         const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const [summary, tx, categoryData, daily, monthly] = await Promise.all([
-            getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
-            getJson('/api/transactions?limit=5'),
-            getJson(`/api/reports/expense-by-category?month=${month}`),
-            getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
-            getJson(
-                `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
-                    endMonth
-                )}&groupBy=month&type=expense`
-            ),
-        ]);
+        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult] =
+            await Promise.allSettled([
+                getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
+                getJson('/api/transactions?limit=5'),
+                getJson(`/api/reports/expense-by-category?month=${month}`),
+                getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
+                getJson(
+                    `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
+                        endMonth
+                    )}&groupBy=month&type=expense`
+                ),
+            ]);
+
+        if (
+            summaryResult.status === 'rejected' ||
+            txResult.status === 'rejected' ||
+            categoryResult.status === 'rejected' ||
+            dailyResult.status === 'rejected' ||
+            monthlyResult.status === 'rejected'
+        ) {
+            showError('Не удалось загрузить все данные дашборда.');
+        }
+
+        const summary =
+            summaryResult.status === 'fulfilled'
+                ? summaryResult.value
+                : { balance: 0, income: 0, expense: 0, net: 0 };
+        const tx =
+            txResult.status === 'fulfilled'
+                ? txResult.value
+                : { transactions: [] };
+        const categoryData =
+            categoryResult.status === 'fulfilled'
+                ? categoryResult.value
+                : { items: [] };
+        const daily =
+            dailyResult.status === 'fulfilled'
+                ? dailyResult.value
+                : { labels: [], income: [], expense: [] };
+        const monthly =
+            monthlyResult.status === 'fulfilled'
+                ? monthlyResult.value
+                : { labels: [], expense: [] };
 
         byId('summary-balance').textContent = formatCurrency(summary.balance);
         byId('summary-income').textContent = formatCurrency(summary.income);
@@ -255,7 +301,7 @@ const initDashboard = async () => {
 
         byId('summary-month-expense').textContent = formatCurrency(summary.expense);
 
-        const rows = tx.transactions.map((item) => [
+        const rows = (tx.transactions || []).map((item) => [
             new Date(item.tx_date).toLocaleDateString('ru-RU'),
             item.tx_type === 'income' ? 'Доход' : 'Расход',
             item.category_name ?? 'Без категории',
@@ -284,11 +330,11 @@ const initDashboard = async () => {
             }
         }
 
-        if (lineCtx && typeof Chart !== 'undefined') {
+        if (lineCtx && chartLib) {
             if (lineChart) {
                 lineChart.destroy();
             }
-            lineChart = new Chart(lineCtx, {
+            lineChart = new chartLib(lineCtx, {
                 type: 'line',
                 data: {
                     labels: daily.labels,
@@ -321,11 +367,11 @@ const initDashboard = async () => {
             });
         }
 
-        if (categoryCtx && typeof Chart !== 'undefined') {
+        if (categoryCtx && chartLib) {
             if (categoryChart) {
                 categoryChart.destroy();
             }
-            categoryChart = new Chart(categoryCtx, {
+            categoryChart = new chartLib(categoryCtx, {
                 type: 'doughnut',
                 data: {
                     labels: categoryData.items.map((item) => item.name),
@@ -347,7 +393,7 @@ const initDashboard = async () => {
             });
         }
 
-        if (monthlyCtx && typeof Chart !== 'undefined') {
+        if (monthlyCtx && chartLib) {
             if (monthlyChart) {
                 monthlyChart.destroy();
             }
@@ -356,7 +402,7 @@ const initDashboard = async () => {
                 const date = new Date(Number(year), Number(monthValue) - 1, 1);
                 return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
             });
-            monthlyChart = new Chart(monthlyCtx, {
+            monthlyChart = new chartLib(monthlyCtx, {
                 type: 'bar',
                 data: {
                     labels: monthLabels,
@@ -383,17 +429,19 @@ const initDashboard = async () => {
     };
 
     const initQuickActions = async () => {
-        const accounts = await getJson('/api/accounts');
-        const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
-
-        fillSelect(byId('quick-account'), accountOptions, 'Выберите');
-        fillSelect(byId('transfer-quick-from'), accountOptions, 'Выберите');
-        fillSelect(byId('transfer-quick-to'), accountOptions, 'Выберите');
+        if (!quickForm || !transferForm) {
+            return;
+        }
 
         const loadCategories = async (type) => {
-            const url = type ? `/api/categories?type=${type}` : '/api/categories';
-            const { categories } = await getJson(url);
-            return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
+            try {
+                const url = type ? `/api/categories?type=${type}` : '/api/categories';
+                const { categories } = await getJson(url);
+                return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
+            } catch (error) {
+                showError('Не удалось загрузить категории.');
+                return [];
+            }
         };
 
         const openQuickModal = async (type) => {
@@ -436,10 +484,24 @@ const initDashboard = async () => {
             closeModal(transferModal);
             await loadDashboard();
         });
+
+        try {
+            const accounts = await getJson('/api/accounts');
+            const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
+
+            fillSelect(byId('quick-account'), accountOptions, 'Выберите');
+            fillSelect(byId('transfer-quick-from'), accountOptions, 'Выберите');
+            fillSelect(byId('transfer-quick-to'), accountOptions, 'Выберите');
+        } catch (error) {
+            showError('Не удалось загрузить список счетов.');
+            fillSelect(byId('quick-account'), [], 'Выберите');
+            fillSelect(byId('transfer-quick-from'), [], 'Выберите');
+            fillSelect(byId('transfer-quick-to'), [], 'Выберите');
+        }
     };
 
-    await loadDashboard();
     await initQuickActions();
+    await loadDashboard();
 };
 
 const initAccounts = async () => {
