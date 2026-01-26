@@ -69,26 +69,80 @@ const renderTable = (container, headers, rows) => {
     });
     table.appendChild(headerRow);
 
-    rows.forEach((row) => {
+    if (rows.length === 0) {
         const rowEl = document.createElement('div');
-        rowEl.className = 'table__row';
-        row.forEach((cell) => {
-            const cellEl = document.createElement('div');
-            if (cell instanceof HTMLElement) {
-                cellEl.appendChild(cell);
-            } else {
-                cellEl.innerHTML = cell;
-            }
-            rowEl.appendChild(cellEl);
-        });
+        rowEl.className = 'table__row table__row--empty';
+        const cellEl = document.createElement('div');
+        cellEl.textContent = getRandomEmptyMessage();
+        rowEl.appendChild(cellEl);
         table.appendChild(rowEl);
-    });
+    } else {
+        rows.forEach((row) => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'table__row';
+            row.forEach((cell) => {
+                const cellEl = document.createElement('div');
+                if (cell instanceof HTMLElement) {
+                    cellEl.appendChild(cell);
+                } else {
+                    cellEl.innerHTML = cell;
+                }
+                rowEl.appendChild(cellEl);
+            });
+            table.appendChild(rowEl);
+        });
+    }
 
     container.innerHTML = '';
     container.appendChild(table);
 };
 
 const serializeForm = (form) => Object.fromEntries(new FormData(form).entries());
+
+const emptyDataMessages = [
+    'Данных нет.',
+    'Данные появятся, когда вы начнете копить и тратить!',
+    'Пока пусто — добавьте доходы и расходы.',
+    'Нет записей, но это легко исправить.',
+    'Добавьте первую операцию, чтобы увидеть статистику.',
+    'Пока без данных — начните вести учет.',
+    'Здесь будут ваши расходы и доходы.',
+    'Добавьте несколько операций для первых результатов.',
+    'Ничего не найдено — самое время начать.',
+    'Пусто, но скоро появятся ваши данные.',
+];
+
+const getRandomEmptyMessage = () => {
+    const index = Math.floor(Math.random() * emptyDataMessages.length);
+    return emptyDataMessages[index];
+};
+
+const toggleChartEmptyState = (canvas, isEmpty) => {
+    if (!canvas) {
+        return;
+    }
+    const container = canvas.parentElement;
+    if (!container) {
+        return;
+    }
+    const selector = `.chart-empty[data-for="${canvas.id}"]`;
+    const existing = container.querySelector(selector);
+    if (isEmpty) {
+        const emptyEl = existing ?? document.createElement('p');
+        emptyEl.className = 'text-muted chart-empty';
+        emptyEl.dataset.for = canvas.id;
+        emptyEl.textContent = getRandomEmptyMessage();
+        if (!existing) {
+            container.insertBefore(emptyEl, canvas.nextSibling);
+        }
+        canvas.style.display = 'none';
+    } else {
+        if (existing) {
+            existing.remove();
+        }
+        canvas.style.display = '';
+    }
+};
 
 let chartLibraryPromise;
 const ensureChart = () => {
@@ -727,7 +781,7 @@ const initDashboard = async () => {
             if (categoryData.items.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
-                empty.textContent = 'Нет расходов за период';
+                empty.textContent = getRandomEmptyMessage();
                 categoryList.appendChild(empty);
             } else {
                 categoryData.items.slice(0, 5).forEach((item) => {
@@ -745,63 +799,75 @@ const initDashboard = async () => {
             if (lineChart) {
                 lineChart.destroy();
             }
-            lineChart = new chartLib(lineCtx, {
-                type: 'line',
-                data: {
-                    labels: daily.labels,
-                    datasets: [
-                        {
-                            label: 'Доходы',
-                            data: daily.income,
-                            borderColor: '#2f7a4d',
-                            backgroundColor: 'rgba(47, 122, 77, 0.15)',
-                            tension: 0.3,
-                            fill: true,
-                        },
-                        {
-                            label: 'Расходы',
-                            data: daily.expense,
-                            borderColor: '#b42318',
-                            backgroundColor: 'rgba(180, 35, 24, 0.1)',
-                            tension: 0.3,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
+            const hasData =
+                daily.labels.length > 0 &&
+                (daily.income.some((value) => Number(value) > 0) ||
+                    daily.expense.some((value) => Number(value) > 0));
+            toggleChartEmptyState(lineCtx, !hasData);
+            if (hasData) {
+                lineChart = new chartLib(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: daily.labels,
+                        datasets: [
+                            {
+                                label: 'Доходы',
+                                data: daily.income,
+                                borderColor: '#2f7a4d',
+                                backgroundColor: 'rgba(47, 122, 77, 0.15)',
+                                tension: 0.3,
+                                fill: true,
+                            },
+                            {
+                                label: 'Расходы',
+                                data: daily.expense,
+                                borderColor: '#b42318',
+                                backgroundColor: 'rgba(180, 35, 24, 0.1)',
+                                tension: 0.3,
+                                fill: true,
+                            },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
                         },
                     },
-                },
-            });
+                });
+            }
         }
 
         if (categoryCtx && chartLib) {
             if (categoryChart) {
                 categoryChart.destroy();
             }
-            categoryChart = new chartLib(categoryCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: categoryData.items.map((item) => item.name),
-                    datasets: [
-                        {
-                            data: categoryData.items.map((item) => item.total),
-                            backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
+            const categoryValues = categoryData.items.map((item) => item.total);
+            const hasData = categoryValues.some((value) => Number(value) > 0);
+            toggleChartEmptyState(categoryCtx, !hasData);
+            if (hasData) {
+                categoryChart = new chartLib(categoryCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: categoryData.items.map((item) => item.name),
+                        datasets: [
+                            {
+                                data: categoryValues,
+                                backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
+                            },
+                        ],
                     },
-                    cutout: '70%',
-                },
-            });
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                        },
+                        cutout: '70%',
+                    },
+                });
+            }
         }
 
         if (monthlyCtx && chartLib) {
@@ -813,29 +879,35 @@ const initDashboard = async () => {
                 const date = new Date(Number(year), Number(monthValue) - 1, 1);
                 return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
             });
-            monthlyChart = new chartLib(monthlyCtx, {
-                type: 'bar',
-                data: {
-                    labels: monthLabels,
-                    datasets: [
-                        {
-                            label: 'Расходы',
-                            data: monthly.expense,
-                            backgroundColor: 'rgba(47, 122, 77, 0.5)',
-                            borderColor: '#2f7a4d',
-                            borderWidth: 1,
-                            borderRadius: 8,
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
+            const hasData =
+                monthLabels.length > 0 &&
+                monthly.expense.some((value) => Number(value) > 0);
+            toggleChartEmptyState(monthlyCtx, !hasData);
+            if (hasData) {
+                monthlyChart = new chartLib(monthlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: monthLabels,
+                        datasets: [
+                            {
+                                label: 'Расходы',
+                                data: monthly.expense,
+                                backgroundColor: 'rgba(47, 122, 77, 0.5)',
+                                borderColor: '#2f7a4d',
+                                borderWidth: 1,
+                                borderRadius: 8,
+                            },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
                         },
                     },
-                },
-            });
+                });
+            }
         }
     };
 
@@ -1313,6 +1385,7 @@ const initReports = async () => {
     let lineChart;
 
     const load = async () => {
+        const chartLib = await ensureChart();
         const data = serializeForm(filterForm);
         const month = data.month || new Date().toISOString().slice(0, 7);
         monthPicker.value = month;
@@ -1331,18 +1404,22 @@ const initReports = async () => {
         if (pieChart) {
             pieChart.destroy();
         }
-        pieChart = new Chart(pieCtx, {
-            type: 'doughnut',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        data: values,
-                        backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
-                    },
-                ],
-            },
-        });
+        const pieHasData = values.some((value) => Number(value) > 0);
+        toggleChartEmptyState(pieCtx, !pieHasData);
+        if (pieHasData && chartLib) {
+            pieChart = new chartLib(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
+                        },
+                    ],
+                },
+            });
+        }
 
         renderTable(
             table,
@@ -1357,26 +1434,33 @@ const initReports = async () => {
         if (lineChart) {
             lineChart.destroy();
         }
-        lineChart = new Chart(lineCtx, {
-            type: 'line',
-            data: {
-                labels: line.labels,
-                datasets: [
-                    {
-                        label: 'Доходы',
-                        data: line.income,
-                        borderColor: '#2f7a4d',
-                        backgroundColor: 'rgba(47, 122, 77, 0.15)',
-                    },
-                    {
-                        label: 'Расходы',
-                        data: line.expense,
-                        borderColor: '#b42318',
-                        backgroundColor: 'rgba(180, 35, 24, 0.1)',
-                    },
-                ],
-            },
-        });
+        const lineHasData =
+            line.labels.length > 0 &&
+            (line.income.some((value) => Number(value) > 0) ||
+                line.expense.some((value) => Number(value) > 0));
+        toggleChartEmptyState(lineCtx, !lineHasData);
+        if (lineHasData && chartLib) {
+            lineChart = new chartLib(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: line.labels,
+                    datasets: [
+                        {
+                            label: 'Доходы',
+                            data: line.income,
+                            borderColor: '#2f7a4d',
+                            backgroundColor: 'rgba(47, 122, 77, 0.15)',
+                        },
+                        {
+                            label: 'Расходы',
+                            data: line.expense,
+                            borderColor: '#b42318',
+                            backgroundColor: 'rgba(180, 35, 24, 0.1)',
+                        },
+                    ],
+                },
+            });
+        }
     };
 
     filterForm.addEventListener('change', load);
