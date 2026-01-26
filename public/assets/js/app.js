@@ -7,6 +7,49 @@ const formatCurrency = (value) => {
 
 const byId = (id) => document.getElementById(id);
 
+const ensureToastContainer = () => {
+    let container = byId('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    return container;
+};
+
+const showToast = (message, variant = 'success') => {
+    const container = ensureToastContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${variant}`;
+    toast.innerHTML = `<strong>${variant === 'error' ? 'Ошибка' : 'Готово'}</strong><span>${message}</span>`;
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+        toast.classList.add('is-visible');
+    });
+    setTimeout(() => {
+        toast.classList.remove('is-visible');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+};
+
+const requestWithToast = async (callback, successMessage) => {
+    try {
+        const result = await callback();
+        if (successMessage) {
+            showToast(successMessage, 'success');
+        } else if (result && result.message) {
+            showToast(result.message, 'success');
+        } else {
+            showToast('Операция выполнена', 'success');
+        }
+        return result;
+    } catch (error) {
+        showToast(error.message || 'Что-то пошло не так', 'error');
+        throw error;
+    }
+};
+
 const renderTable = (container, headers, rows) => {
     const table = document.createElement('div');
     table.className = 'table';
@@ -67,7 +110,7 @@ const setFormValues = (form, values) => {
 };
 
 const showError = (message) => {
-    alert(message);
+    showToast(message, 'error');
 };
 
 const setupLogout = () => {
@@ -114,23 +157,289 @@ const initAuthForms = () => {
 };
 
 const initDashboard = async () => {
-    const summary = await getJson('/api/reports/summary');
-    byId('summary-balance').textContent = formatCurrency(summary.balance);
-    byId('summary-income').textContent = formatCurrency(summary.income);
-    byId('summary-expense').textContent = formatCurrency(summary.expense);
-    byId('summary-net').textContent = formatCurrency(summary.net);
-    byId('summary-net-note').textContent = summary.net >= 0 ? 'профицит' : 'дефицит';
+    const lineCtx = byId('dashboard-line');
+    const categoryCtx = byId('dashboard-category');
+    const monthlyCtx = byId('dashboard-monthly');
+    const categoryList = byId('dashboard-category-list');
+    const quickModal = byId('quick-modal');
+    const transferModal = byId('transfer-modal');
+    const quickForm = byId('quick-form');
+    const transferForm = byId('transfer-quick-form');
 
-    const tx = await getJson('/api/transactions?limit=5');
-    const rows = tx.transactions.map((item) => [
-        new Date(item.tx_date).toLocaleDateString('ru-RU'),
-        item.tx_type === 'income' ? 'Доход' : 'Расход',
-        item.category_name ?? 'Без категории',
-        item.account_name ?? '—',
-        formatCurrency(item.amount),
-    ]);
+    let lineChart;
+    let categoryChart;
+    let monthlyChart;
 
-    renderTable(byId('dashboard-transactions'), ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма'], rows);
+    const formatDateInput = (date) => {
+        const pad = (value) => String(value).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formatDate = (date) => date.toISOString().slice(0, 10);
+
+    const openModal = (modal) => {
+        if (!modal) {
+            return;
+        }
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+
+    const closeModal = (modal) => {
+        if (!modal) {
+            return;
+        }
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (target.dataset.action === 'close-modal') {
+            closeModal(quickModal);
+            closeModal(transferModal);
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeModal(quickModal);
+            closeModal(transferModal);
+        }
+    });
+
+    const loadDashboard = async () => {
+        const now = new Date();
+        const month = now.toISOString().slice(0, 7);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const dateFrom = `${month}-01`;
+        const dateTo = `${month}-${String(lastDay).padStart(2, '0')}`;
+
+        const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        const [summary, tx, categoryData, daily, monthly] = await Promise.all([
+            getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
+            getJson('/api/transactions?limit=5'),
+            getJson(`/api/reports/expense-by-category?month=${month}`),
+            getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
+            getJson(
+                `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
+                    endMonth
+                )}&groupBy=month&type=expense`
+            ),
+        ]);
+
+        byId('summary-balance').textContent = formatCurrency(summary.balance);
+        byId('summary-income').textContent = formatCurrency(summary.income);
+        byId('summary-expense').textContent = formatCurrency(summary.expense);
+        byId('summary-net').textContent = formatCurrency(summary.net);
+        byId('summary-net-note').textContent = summary.net >= 0 ? 'профицит' : 'дефицит';
+
+        byId('summary-average-expense').textContent = formatCurrency(summary.expense / lastDay);
+        byId('summary-average-expense-note').textContent = `в ${lastDay} днях месяца`;
+
+        const topCategory = categoryData.items[0];
+        byId('summary-top-category').textContent = topCategory ? topCategory.name : '—';
+        byId('summary-top-category-amount').textContent = topCategory
+            ? formatCurrency(topCategory.total)
+            : 'нет данных';
+
+        const savingsRate = summary.income > 0 ? (summary.expense / summary.income) * 100 : 0;
+        byId('summary-savings-rate').textContent = `${savingsRate.toFixed(1)}%`;
+        byId('summary-savings-rate-note').textContent =
+            summary.expense <= summary.income ? 'в пределах бюджета' : 'перерасход';
+
+        byId('summary-month-expense').textContent = formatCurrency(summary.expense);
+
+        const rows = tx.transactions.map((item) => [
+            new Date(item.tx_date).toLocaleDateString('ru-RU'),
+            item.tx_type === 'income' ? 'Доход' : 'Расход',
+            item.category_name ?? 'Без категории',
+            item.account_name ?? '—',
+            formatCurrency(item.amount),
+        ]);
+
+        renderTable(byId('dashboard-transactions'), ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма'], rows);
+
+        if (categoryList) {
+            categoryList.innerHTML = '';
+            if (categoryData.items.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-muted';
+                empty.textContent = 'Нет расходов за период';
+                categoryList.appendChild(empty);
+            } else {
+                categoryData.items.slice(0, 5).forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = 'stat-item';
+                    row.innerHTML = `<span>${item.name}</span><span class="stat-item__value">${formatCurrency(
+                        item.total
+                    )}</span>`;
+                    categoryList.appendChild(row);
+                });
+            }
+        }
+
+        if (lineCtx && typeof Chart !== 'undefined') {
+            if (lineChart) {
+                lineChart.destroy();
+            }
+            lineChart = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: daily.labels,
+                    datasets: [
+                        {
+                            label: 'Доходы',
+                            data: daily.income,
+                            borderColor: '#2f7a4d',
+                            backgroundColor: 'rgba(47, 122, 77, 0.15)',
+                            tension: 0.3,
+                            fill: true,
+                        },
+                        {
+                            label: 'Расходы',
+                            data: daily.expense,
+                            borderColor: '#b42318',
+                            backgroundColor: 'rgba(180, 35, 24, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                        },
+                    ],
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                    },
+                },
+            });
+        }
+
+        if (categoryCtx && typeof Chart !== 'undefined') {
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            categoryChart = new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryData.items.map((item) => item.name),
+                    datasets: [
+                        {
+                            data: categoryData.items.map((item) => item.total),
+                            backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
+                        },
+                    ],
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                    },
+                    cutout: '70%',
+                },
+            });
+        }
+
+        if (monthlyCtx && typeof Chart !== 'undefined') {
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+            const monthLabels = monthly.labels.map((label) => {
+                const [year, monthValue] = label.split('-');
+                const date = new Date(Number(year), Number(monthValue) - 1, 1);
+                return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
+            });
+            monthlyChart = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            label: 'Расходы',
+                            data: monthly.expense,
+                            backgroundColor: 'rgba(47, 122, 77, 0.5)',
+                            borderColor: '#2f7a4d',
+                            borderWidth: 1,
+                            borderRadius: 8,
+                        },
+                    ],
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                    },
+                },
+            });
+        }
+    };
+
+    const initQuickActions = async () => {
+        const accounts = await getJson('/api/accounts');
+        const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
+
+        fillSelect(byId('quick-account'), accountOptions, 'Выберите');
+        fillSelect(byId('transfer-quick-from'), accountOptions, 'Выберите');
+        fillSelect(byId('transfer-quick-to'), accountOptions, 'Выберите');
+
+        const loadCategories = async (type) => {
+            const url = type ? `/api/categories?type=${type}` : '/api/categories';
+            const { categories } = await getJson(url);
+            return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
+        };
+
+        const openQuickModal = async (type) => {
+            quickForm.reset();
+            byId('quick-type').value = type;
+            byId('quick-modal-title').textContent = type === 'income' ? 'Новый доход' : 'Новый расход';
+            byId('quick-date').value = formatDateInput(new Date());
+            const options = await loadCategories(type);
+            fillSelect(byId('quick-category'), options, 'Без категории');
+            openModal(quickModal);
+        };
+
+        document.querySelectorAll('[data-action="open-quick"]').forEach((btn) => {
+            btn.addEventListener('click', () => openQuickModal(btn.dataset.type));
+        });
+
+        document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                transferForm.reset();
+                byId('transfer-quick-date').value = formatDateInput(new Date());
+                openModal(transferModal);
+            });
+        });
+
+        quickForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = serializeForm(event.target);
+            await requestWithToast(
+                () => postJson('/api/transactions', data),
+                data.tx_type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
+            );
+            closeModal(quickModal);
+            await loadDashboard();
+        });
+
+        transferForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = serializeForm(event.target);
+            await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
+            closeModal(transferModal);
+            await loadDashboard();
+        });
+    };
+
+    await loadDashboard();
+    await initQuickActions();
 };
 
 const initAccounts = async () => {
@@ -164,7 +473,10 @@ const initAccounts = async () => {
                 deleteBtn.className = 'btn btn-outline btn-sm';
                 deleteBtn.textContent = 'Скрыть';
                 deleteBtn.addEventListener('click', async () => {
-                    await deleteJson(`/api/accounts/${acc.account_id}`);
+                    await requestWithToast(
+                        () => deleteJson(`/api/accounts/${acc.account_id}`),
+                        'Счёт скрыт'
+                    );
                     await load();
                 });
 
@@ -191,9 +503,12 @@ const initAccounts = async () => {
         const id = data.account_id;
         delete data.account_id;
         if (id) {
-            await putJson(`/api/accounts/${id}`, data);
+            await requestWithToast(
+                () => putJson(`/api/accounts/${id}`, data),
+                'Счёт обновлён'
+            );
         } else {
-            await postJson('/api/accounts', data);
+            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан');
         }
         form.reset();
         title.textContent = 'Новый счёт';
@@ -240,7 +555,10 @@ const initCategories = async () => {
                 deleteBtn.className = 'btn btn-outline btn-sm';
                 deleteBtn.textContent = 'Скрыть';
                 deleteBtn.addEventListener('click', async () => {
-                    await deleteJson(`/api/categories/${cat.category_id}`);
+                    await requestWithToast(
+                        () => deleteJson(`/api/categories/${cat.category_id}`),
+                        'Категория скрыта'
+                    );
                     await load();
                 });
 
@@ -260,9 +578,12 @@ const initCategories = async () => {
         const id = data.category_id;
         delete data.category_id;
         if (id) {
-            await putJson(`/api/categories/${id}`, data);
+            await requestWithToast(
+                () => putJson(`/api/categories/${id}`, data),
+                'Категория обновлена'
+            );
         } else {
-            await postJson('/api/categories', data);
+            await requestWithToast(() => postJson('/api/categories', data), 'Категория создана');
         }
         form.reset();
         title.textContent = 'Новая категория';
@@ -343,7 +664,10 @@ const initTransactions = async () => {
                 deleteBtn.className = 'btn btn-outline btn-sm';
                 deleteBtn.textContent = 'Удалить';
                 deleteBtn.addEventListener('click', async () => {
-                    await deleteJson(`/api/transactions/${tx.transaction_id}`);
+                    await requestWithToast(
+                        () => deleteJson(`/api/transactions/${tx.transaction_id}`),
+                        'Операция удалена'
+                    );
                     await loadTransactions();
                 });
 
@@ -375,7 +699,10 @@ const initTransactions = async () => {
                 deleteBtn.className = 'btn btn-outline btn-sm';
                 deleteBtn.textContent = 'Удалить';
                 deleteBtn.addEventListener('click', async () => {
-                    await deleteJson(`/api/transfers/${tr.transfer_id}`);
+                    await requestWithToast(
+                        () => deleteJson(`/api/transfers/${tr.transfer_id}`),
+                        'Перевод удалён'
+                    );
                     await loadTransfers();
                 });
                 return [
@@ -416,9 +743,12 @@ const initTransactions = async () => {
         const id = data.transaction_id;
         delete data.transaction_id;
         if (id) {
-            await putJson(`/api/transactions/${id}`, data);
+            await requestWithToast(
+                () => putJson(`/api/transactions/${id}`, data),
+                'Операция обновлена'
+            );
         } else {
-            await postJson('/api/transactions', data);
+            await requestWithToast(() => postJson('/api/transactions', data), 'Операция добавлена');
         }
         form.reset();
         title.textContent = 'Новая операция';
@@ -433,7 +763,7 @@ const initTransactions = async () => {
     byId('transfer-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const data = serializeForm(event.target);
-        await postJson('/api/transfers', data);
+        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
         event.target.reset();
         await loadTransfers();
     });
@@ -487,7 +817,10 @@ const initBudgets = async () => {
                 deleteBtn.className = 'btn btn-outline btn-sm';
                 deleteBtn.textContent = 'Удалить';
                 deleteBtn.addEventListener('click', async () => {
-                    await deleteJson(`/api/budgets/${b.budget_id}`);
+                    await requestWithToast(
+                        () => deleteJson(`/api/budgets/${b.budget_id}`),
+                        'Бюджет удалён'
+                    );
                     await load();
                 });
 
@@ -509,9 +842,12 @@ const initBudgets = async () => {
         const id = data.budget_id;
         delete data.budget_id;
         if (id) {
-            await putJson(`/api/budgets/${id}`, data);
+            await requestWithToast(
+                () => putJson(`/api/budgets/${id}`, data),
+                'Бюджет обновлён'
+            );
         } else {
-            await postJson('/api/budgets', data);
+            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан');
         }
         form.reset();
         title.textContent = 'Новый бюджет';
@@ -576,7 +912,10 @@ const initGoals = async () => {
             deleteBtn.className = 'btn btn-outline btn-sm';
             deleteBtn.textContent = 'Удалить';
             deleteBtn.addEventListener('click', async () => {
-                await deleteJson(`/api/goals/${goal.goal_id}`);
+                await requestWithToast(
+                    () => deleteJson(`/api/goals/${goal.goal_id}`),
+                    'Цель удалена'
+                );
                 await renderGoals();
             });
 
@@ -592,9 +931,9 @@ const initGoals = async () => {
         const id = data.goal_id;
         delete data.goal_id;
         if (id) {
-            await putJson(`/api/goals/${id}`, data);
+            await requestWithToast(() => putJson(`/api/goals/${id}`, data), 'Цель обновлена');
         } else {
-            await postJson('/api/goals', data);
+            await requestWithToast(() => postJson('/api/goals', data), 'Цель добавлена');
         }
         form.reset();
         title.textContent = 'Новая цель';
