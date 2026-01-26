@@ -5,7 +5,6 @@ namespace App\Controllers;
 use App\Services\Auth;
 use App\Services\Request;
 use App\Services\Response;
-use App\Services\Database;
 
 class AuthController
 {
@@ -57,8 +56,7 @@ class AuthController
 
     public function me()
     {
-        $pdo = Database::connection();
-        $user = Auth::user($pdo);
+        $user = Auth::user();
         if (!$user) {
             Response::json(['user' => null], 401);
             return;
