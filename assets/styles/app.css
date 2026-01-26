@@ -201,6 +201,19 @@ a {
     letter-spacing: 0.04em;
 }
 
+.table__row--empty {
+    grid-template-columns: 1fr;
+    text-align: center;
+    color: var(--gray-500);
+}
+
+.chart-empty {
+    text-align: center;
+    color: var(--gray-500);
+    margin: 0;
+    padding: 16px 0;
+}
+
 .grid {
     display: grid;
     gap: 16px;

@@ -117,6 +117,33 @@ const getRandomEmptyMessage = () => {
     return emptyDataMessages[index];
 };
 
+const toggleChartEmptyState = (canvas, isEmpty) => {
+    if (!canvas) {
+        return;
+    }
+    const container = canvas.parentElement;
+    if (!container) {
+        return;
+    }
+    const selector = `.chart-empty[data-for="${canvas.id}"]`;
+    const existing = container.querySelector(selector);
+    if (isEmpty) {
+        const emptyEl = existing ?? document.createElement('p');
+        emptyEl.className = 'text-muted chart-empty';
+        emptyEl.dataset.for = canvas.id;
+        emptyEl.textContent = getRandomEmptyMessage();
+        if (!existing) {
+            container.insertBefore(emptyEl, canvas.nextSibling);
+        }
+        canvas.style.display = 'none';
+    } else {
+        if (existing) {
+            existing.remove();
+        }
+        canvas.style.display = '';
+    }
+};
+
 let chartLibraryPromise;
 const ensureChart = () => {
     if (window.Chart) {
@@ -1239,7 +1266,9 @@ const initReports = async () => {
         const labels = pie.items.map((item) => item.name);
         const values = pie.items.map((item) => item.total);
 
-        if (chartLib && pieCtx) {
+        const pieHasData = values.some((value) => Number(value) > 0);
+        toggleChartEmptyState(pieCtx, !pieHasData);
+        if (pieHasData && chartLib && pieCtx) {
             if (pieChart) {
                 pieChart.destroy();
             }
@@ -1255,6 +1284,9 @@ const initReports = async () => {
                     ],
                 },
             });
+        } else if (pieChart) {
+            pieChart.destroy();
+            pieChart = null;
         }
 
         renderTable(
@@ -1267,7 +1299,12 @@ const initReports = async () => {
             })
         );
 
-        if (chartLib && lineCtx) {
+        const lineHasData =
+            line.labels.length > 0 &&
+            (line.income.some((value) => Number(value) > 0) ||
+                line.expense.some((value) => Number(value) > 0));
+        toggleChartEmptyState(lineCtx, !lineHasData);
+        if (lineHasData && chartLib && lineCtx) {
             if (lineChart) {
                 lineChart.destroy();
             }
@@ -1291,6 +1328,9 @@ const initReports = async () => {
                     ],
                 },
             });
+        } else if (lineChart) {
+            lineChart.destroy();
+            lineChart = null;
         }
     };
 
