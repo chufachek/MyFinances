@@ -1,45 +1,44 @@
 <section class="page">
     <header class="page__header">
         <div>
-            <h1>Финансовая панель</h1>
-            <p>Сводка ключевых метрик и свежих операций.</p>
+            <h1>Дашборд</h1>
+            <p class="text-muted">Сводка по финансам и быстрые действия.</p>
         </div>
-        <button class="button button--primary">Добавить операцию</button>
+        <div class="page__actions">
+            <button class="btn btn-primary" data-action="open-quick" data-type="income">+ Доход</button>
+            <button class="btn btn-secondary" data-action="open-quick" data-type="expense">+ Расход</button>
+            <button class="btn btn-outline" data-action="open-transfer">+ Перевод</button>
+        </div>
     </header>
 
-    <div class="grid grid--stats">
+    <div class="cards">
         <article class="card">
-            <h3>Баланс</h3>
-            <p class="metric">₽ 268 400</p>
-            <span class="badge badge--success">+12% к прошлому месяцу</span>
+            <p class="card__label">Общий баланс</p>
+            <h2 id="summary-balance">—</h2>
+            <span class="card__trend" id="summary-balance-note">по всем счетам</span>
         </article>
         <article class="card">
-            <h3>Расходы</h3>
-            <p class="metric">₽ 84 120</p>
-            <span class="badge badge--warning">-4% к прошлому месяцу</span>
+            <p class="card__label">Доходы за месяц</p>
+            <h2 id="summary-income">—</h2>
+            <span class="card__trend positive">+ поступления</span>
         </article>
         <article class="card">
-            <h3>Сбережения</h3>
-            <p class="metric">₽ 42 500</p>
-            <span class="badge">Цель: 60 000</span>
+            <p class="card__label">Расходы за месяц</p>
+            <h2 id="summary-expense">—</h2>
+            <span class="card__trend negative">- траты</span>
+        </article>
+        <article class="card">
+            <p class="card__label">Разница</p>
+            <h2 id="summary-net">—</h2>
+            <span class="card__trend" id="summary-net-note">итог периода</span>
         </article>
     </div>
 
-    <div class="grid grid--split">
-        <article class="card">
-            <h3>Свежие транзакции</h3>
-            <div class="table" data-widget="transactions"></div>
-        </article>
-        <article class="card">
-            <h3>Структура расходов</h3>
-            <div class="chart" data-widget="categories">
-                <div class="chart__legend">
-                    <span>Дом и ЖКХ</span><span>35%</span>
-                    <span>Еда</span><span>25%</span>
-                    <span>Транспорт</span><span>18%</span>
-                    <span>Отдых</span><span>12%</span>
-                </div>
-            </div>
-        </article>
-    </div>
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Последние операции</h3>
+            <a class="link" href="/transactions">Открыть все</a>
+        </div>
+        <div id="dashboard-transactions" class="table"></div>
+    </section>
 </section>

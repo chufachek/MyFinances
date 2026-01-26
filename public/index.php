@@ -2,10 +2,18 @@
 
 declare(strict_types=1);
 
-$autoload = __DIR__ . '/../vendor/autoload.php';
-if (file_exists($autoload)) {
-    require $autoload;
-}
+require __DIR__ . '/../app/bootstrap.php';
+
+use App\Controllers\AccountsController;
+use App\Controllers\AuthController;
+use App\Controllers\BudgetsController;
+use App\Controllers\CategoriesController;
+use App\Controllers\GoalsController;
+use App\Controllers\ReportsController;
+use App\Controllers\TransactionsController;
+use App\Controllers\TransfersController;
+use App\Services\Auth;
+use App\Services\Response;
 
 $router = new \Bramus\Router\Router();
 
@@ -31,20 +39,101 @@ $render = static function (string $view, array $data = []): void {
     require __DIR__ . '/../app/Views/layout.php';
 };
 
-$router->get('/', static fn () => $render('dashboard', ['title' => 'Dashboard']));
-$router->get('/login', static fn () => $render('login', ['title' => 'Login']));
-$router->get('/register', static fn () => $render('register', ['title' => 'Register']));
-$router->get('/dashboard', static fn () => $render('dashboard', ['title' => 'Dashboard']));
-$router->get('/transactions', static fn () => $render('transactions', ['title' => 'Transactions']));
-$router->get('/accounts', static fn () => $render('accounts', ['title' => 'Accounts']));
-$router->get('/categories', static fn () => $render('categories', ['title' => 'Categories']));
-$router->get('/budgets', static fn () => $render('budgets', ['title' => 'Budgets']));
-$router->get('/goals', static fn () => $render('goals', ['title' => 'Goals']));
-$router->get('/reports', static fn () => $render('reports', ['title' => 'Reports']));
+$router->before('GET|POST|PUT|DELETE', '/api/.*', static function (): void {
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '';
+    if (in_array($path, ['/api/auth/login', '/api/auth/register'], true)) {
+        return;
+    }
+    if (!Auth::check()) {
+        Response::json(['error' => 'Unauthorized'], 401);
+        exit;
+    }
+});
+
+$authRequired = static function (): void {
+    if (!Auth::check()) {
+        header('Location: /login');
+        exit;
+    }
+};
+
+$router->get('/', static function () use ($render): void {
+    header('Location: /dashboard');
+});
+
+$router->get('/login', static fn () => $render('login', ['title' => 'Вход', 'showSidebar' => false]));
+$router->get('/register', static fn () => $render('register', ['title' => 'Регистрация', 'showSidebar' => false]));
+
+$router->get('/dashboard', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('dashboard', ['title' => 'Дашборд', 'page' => 'dashboard']);
+});
+$router->get('/transactions', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('transactions', ['title' => 'Операции', 'page' => 'transactions']);
+});
+$router->get('/accounts', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('accounts', ['title' => 'Счета', 'page' => 'accounts']);
+});
+$router->get('/categories', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('categories', ['title' => 'Категории', 'page' => 'categories']);
+});
+$router->get('/budgets', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('budgets', ['title' => 'Бюджеты', 'page' => 'budgets']);
+});
+$router->get('/goals', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('goals', ['title' => 'Цели', 'page' => 'goals']);
+});
+$router->get('/reports', static function () use ($render, $authRequired): void {
+    $authRequired();
+    $render('reports', ['title' => 'Отчёты', 'page' => 'reports']);
+});
+
+$router->post('/api/auth/register', [new AuthController(), 'register']);
+$router->post('/api/auth/login', [new AuthController(), 'login']);
+$router->post('/api/auth/logout', [new AuthController(), 'logout']);
+$router->get('/api/auth/me', [new AuthController(), 'me']);
+
+$router->get('/api/accounts', [new AccountsController(), 'index']);
+$router->post('/api/accounts', [new AccountsController(), 'store']);
+$router->put('/api/accounts/{id}', [new AccountsController(), 'update']);
+$router->delete('/api/accounts/{id}', [new AccountsController(), 'delete']);
+
+$router->get('/api/categories', [new CategoriesController(), 'index']);
+$router->post('/api/categories', [new CategoriesController(), 'store']);
+$router->put('/api/categories/{id}', [new CategoriesController(), 'update']);
+$router->delete('/api/categories/{id}', [new CategoriesController(), 'delete']);
+
+$router->get('/api/transactions', [new TransactionsController(), 'index']);
+$router->post('/api/transactions', [new TransactionsController(), 'store']);
+$router->put('/api/transactions/{id}', [new TransactionsController(), 'update']);
+$router->delete('/api/transactions/{id}', [new TransactionsController(), 'delete']);
+
+$router->get('/api/transfers', [new TransfersController(), 'index']);
+$router->post('/api/transfers', [new TransfersController(), 'store']);
+$router->delete('/api/transfers/{id}', [new TransfersController(), 'delete']);
+
+$router->get('/api/budgets', [new BudgetsController(), 'index']);
+$router->post('/api/budgets', [new BudgetsController(), 'store']);
+$router->put('/api/budgets/{id}', [new BudgetsController(), 'update']);
+$router->delete('/api/budgets/{id}', [new BudgetsController(), 'delete']);
+
+$router->get('/api/goals', [new GoalsController(), 'index']);
+$router->post('/api/goals', [new GoalsController(), 'store']);
+$router->put('/api/goals/{id}', [new GoalsController(), 'update']);
+$router->delete('/api/goals/{id}', [new GoalsController(), 'delete']);
+
+$router->get('/api/reports/summary', [new ReportsController(), 'summary']);
+$router->get('/api/reports/expense-by-category', [new ReportsController(), 'expenseByCategory']);
+$router->get('/api/reports/dynamics', [new ReportsController(), 'dynamics']);
 
 $router->set404(static function () use ($render): void {
     http_response_code(404);
-    $render('dashboard', ['title' => 'Page Not Found']);
+    $render('dashboard', ['title' => 'Страница не найдена', 'page' => 'dashboard']);
 });
 
 $router->run();

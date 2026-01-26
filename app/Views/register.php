@@ -1,29 +1,26 @@
-<section class="page">
-    <header class="page__header">
-        <div>
-            <h1>Создать аккаунт</h1>
-            <p>Настройте профиль и получите аналитику расходов.</p>
-        </div>
-    </header>
-
-    <div class="card card--form">
-        <form class="form" method="post" action="/register">
-            <label class="form__field">
+<section class="auth">
+    <div class="auth__card">
+        <h1>Регистрация</h1>
+        <p class="text-muted">Создайте аккаунт и начните учет.</p>
+        <form id="register-form" class="stack">
+            <label class="field">
                 <span>Имя</span>
-                <input type="text" name="name" placeholder="Алексей" required>
+                <input type="text" name="full_name" placeholder="Анна Петрова">
             </label>
-            <label class="form__field">
+            <label class="field">
                 <span>Email</span>
-                <input type="email" name="email" placeholder="you@example.com" required>
+                <input type="email" name="email" required>
             </label>
-            <label class="form__field">
+            <label class="field">
                 <span>Пароль</span>
-                <input type="password" name="password" placeholder="Минимум 8 символов" required>
+                <input type="password" name="password" required minlength="6">
             </label>
-            <div class="form__actions">
-                <button class="button button--primary" type="submit">Зарегистрироваться</button>
-                <a class="link" href="/login">Уже есть аккаунт</a>
-            </div>
+            <label class="field">
+                <span>Повторите пароль</span>
+                <input type="password" name="password_confirm" required minlength="6">
+            </label>
+            <button class="btn btn-primary" type="submit">Создать аккаунт</button>
         </form>
+        <p class="text-muted">Уже есть аккаунт? <a class="link" href="/login">Войти</a></p>
     </div>
 </section>
