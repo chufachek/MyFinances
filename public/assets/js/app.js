@@ -122,9 +122,54 @@ const setFormValues = (form, values) => {
     });
 };
 
+const formatDateTimeLocal = (date) => {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+        date.getMinutes()
+    )}`;
+};
+
+const normalizeDateTime = (value) => (value ? value.replace(' ', 'T') : '');
+
 const showError = (message) => {
     showToast(message, 'error');
 };
+
+const openModal = (modal) => {
+    if (!modal) {
+        return;
+    }
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+};
+
+const closeModal = (modal) => {
+    if (!modal) {
+        return;
+    }
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+};
+
+const closeAllModals = () => {
+    document.querySelectorAll('.modal.is-open').forEach((modal) => closeModal(modal));
+};
+
+document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+    if (target.dataset.action === 'close-modal') {
+        closeAllModals();
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeAllModals();
+    }
+});
 
 const setupLogout = () => {
     document.querySelectorAll('[data-action="logout"]').forEach((btn) => {
@@ -133,6 +178,132 @@ const setupLogout = () => {
             window.location.href = '/login';
         });
     });
+};
+
+const initTransactionModal = async () => {
+    const modal = byId('quick-modal');
+    const form = byId('quick-form');
+    if (!modal || !form) {
+        return null;
+    }
+
+    const title = byId('quick-modal-title');
+    const typeSelect = byId('quick-type');
+    const accountSelect = byId('quick-account');
+    const categorySelect = byId('quick-category');
+    const dateInput = byId('quick-date');
+    const transactionId = byId('quick-transaction-id');
+
+    let onSaved = null;
+    let accountsReady = false;
+
+    const setOnSaved = (handler) => {
+        onSaved = handler;
+    };
+
+    const loadAccounts = async () => {
+        if (accountsReady) {
+            return;
+        }
+        try {
+            const accounts = await getJson('/api/accounts');
+            const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
+            fillSelect(accountSelect, accountOptions, 'Выберите');
+            accountsReady = true;
+        } catch (error) {
+            showError('Не удалось загрузить список счетов.');
+            fillSelect(accountSelect, [], 'Выберите');
+        }
+    };
+
+    const loadCategories = async (type) => {
+        try {
+            const url = type ? `/api/categories?type=${type}` : '/api/categories';
+            const { categories } = await getJson(url);
+            return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
+        } catch (error) {
+            showError('Не удалось загрузить категории.');
+            return [];
+        }
+    };
+
+    const getTitle = (type, isEdit) => {
+        if (isEdit) {
+            return 'Редактирование операции';
+        }
+        if (type === 'income') {
+            return 'Новый доход';
+        }
+        if (type === 'expense') {
+            return 'Новый расход';
+        }
+        return 'Новая операция';
+    };
+
+    const updateCategories = async (type, selectedValue = '') => {
+        const options = await loadCategories(type);
+        fillSelect(categorySelect, options, 'Без категории');
+        if (selectedValue) {
+            categorySelect.value = selectedValue;
+        }
+    };
+
+    const open = async ({ type, transaction } = {}) => {
+        await loadAccounts();
+        form.reset();
+        const isEdit = Boolean(transaction);
+        const resolvedType = type || transaction?.tx_type || typeSelect.value || 'expense';
+        typeSelect.value = resolvedType;
+        title.textContent = getTitle(resolvedType, isEdit);
+        transactionId.value = transaction?.transaction_id ?? '';
+        dateInput.value = transaction?.tx_date ? normalizeDateTime(transaction.tx_date) : formatDateTimeLocal(new Date());
+        await updateCategories(resolvedType, transaction?.category_id ?? '');
+
+        if (transaction) {
+            setFormValues(form, {
+                tx_type: transaction.tx_type,
+                account_id: transaction.account_id,
+                amount: transaction.amount,
+                note: transaction.note,
+                merchant: transaction.merchant_name,
+            });
+            if (transaction.category_id) {
+                categorySelect.value = transaction.category_id;
+            }
+        }
+
+        openModal(modal);
+    };
+
+    typeSelect.addEventListener('change', async () => {
+        title.textContent = getTitle(typeSelect.value, Boolean(transactionId.value));
+        await updateCategories(typeSelect.value, categorySelect.value);
+    });
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = serializeForm(form);
+        const id = data.transaction_id;
+        delete data.transaction_id;
+        if (id) {
+            await requestWithToast(() => putJson(`/api/transactions/${id}`, data), 'Операция обновлена');
+        } else {
+            await requestWithToast(
+                () => postJson('/api/transactions', data),
+                data.tx_type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
+            );
+        }
+        closeModal(modal);
+        if (onSaved) {
+            await onSaved();
+        }
+    });
+
+    document.querySelectorAll('[data-action="open-quick"]').forEach((btn) => {
+        btn.addEventListener('click', () => open({ type: btn.dataset.type }));
+    });
+
+    return { open, setOnSaved };
 };
 
 const initAuthForms = () => {
@@ -174,55 +345,14 @@ const initDashboard = async () => {
     const categoryCtx = byId('dashboard-category');
     const monthlyCtx = byId('dashboard-monthly');
     const categoryList = byId('dashboard-category-list');
-    const quickModal = byId('quick-modal');
     const transferModal = byId('transfer-modal');
-    const quickForm = byId('quick-form');
     const transferForm = byId('transfer-quick-form');
 
     let lineChart;
     let categoryChart;
     let monthlyChart;
 
-    const formatDateInput = (date) => {
-        const pad = (value) => String(value).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
     const formatDate = (date) => date.toISOString().slice(0, 10);
-
-    const openModal = (modal) => {
-        if (!modal) {
-            return;
-        }
-        modal.classList.add('is-open');
-        modal.setAttribute('aria-hidden', 'false');
-    };
-
-    const closeModal = (modal) => {
-        if (!modal) {
-            return;
-        }
-        modal.classList.remove('is-open');
-        modal.setAttribute('aria-hidden', 'true');
-    };
-
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (target.dataset.action === 'close-modal') {
-            closeModal(quickModal);
-            closeModal(transferModal);
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            closeModal(quickModal);
-            closeModal(transferModal);
-        }
-    });
 
     const loadDashboard = async () => {
         const chartLib = await ensureChart();
@@ -428,53 +558,22 @@ const initDashboard = async () => {
         }
     };
 
+    const transactionModal = await initTransactionModal();
+    if (transactionModal) {
+        transactionModal.setOnSaved(loadDashboard);
+    }
+
     const initQuickActions = async () => {
-        if (!quickForm || !transferForm) {
+        if (!transferForm) {
             return;
         }
-
-        const loadCategories = async (type) => {
-            try {
-                const url = type ? `/api/categories?type=${type}` : '/api/categories';
-                const { categories } = await getJson(url);
-                return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
-            } catch (error) {
-                showError('Не удалось загрузить категории.');
-                return [];
-            }
-        };
-
-        const openQuickModal = async (type) => {
-            quickForm.reset();
-            byId('quick-type').value = type;
-            byId('quick-modal-title').textContent = type === 'income' ? 'Новый доход' : 'Новый расход';
-            byId('quick-date').value = formatDateInput(new Date());
-            const options = await loadCategories(type);
-            fillSelect(byId('quick-category'), options, 'Без категории');
-            openModal(quickModal);
-        };
-
-        document.querySelectorAll('[data-action="open-quick"]').forEach((btn) => {
-            btn.addEventListener('click', () => openQuickModal(btn.dataset.type));
-        });
 
         document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 transferForm.reset();
-                byId('transfer-quick-date').value = formatDateInput(new Date());
+                byId('transfer-quick-date').value = formatDateTimeLocal(new Date());
                 openModal(transferModal);
             });
-        });
-
-        quickForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const data = serializeForm(event.target);
-            await requestWithToast(
-                () => postJson('/api/transactions', data),
-                data.tx_type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
-            );
-            closeModal(quickModal);
-            await loadDashboard();
         });
 
         transferForm.addEventListener('submit', async (event) => {
@@ -489,12 +588,10 @@ const initDashboard = async () => {
             const accounts = await getJson('/api/accounts');
             const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
 
-            fillSelect(byId('quick-account'), accountOptions, 'Выберите');
             fillSelect(byId('transfer-quick-from'), accountOptions, 'Выберите');
             fillSelect(byId('transfer-quick-to'), accountOptions, 'Выберите');
         } catch (error) {
             showError('Не удалось загрузить список счетов.');
-            fillSelect(byId('quick-account'), [], 'Выберите');
             fillSelect(byId('transfer-quick-from'), [], 'Выберите');
             fillSelect(byId('transfer-quick-to'), [], 'Выберите');
         }
@@ -665,10 +762,6 @@ const initCategories = async () => {
 const initTransactions = async () => {
     const table = byId('transactions-table');
     const filterForm = byId('transactions-filter');
-    const form = byId('transactions-form');
-    const title = byId('transactions-form-title');
-    const cancel = byId('transactions-cancel');
-    const addBtn = byId('transactions-add');
     const resetBtn = byId('transactions-reset');
     const transfersTable = byId('transfers-table');
 
@@ -676,7 +769,6 @@ const initTransactions = async () => {
     const accountOptions = accounts.accounts.map((acc) => ({ value: acc.account_id, label: acc.name }));
 
     fillSelect(byId('filter-account'), accountOptions, 'Все');
-    fillSelect(byId('tx-account'), accountOptions, 'Выберите');
     fillSelect(byId('transfer-from'), accountOptions, 'Выберите');
     fillSelect(byId('transfer-to'), accountOptions, 'Выберите');
 
@@ -686,17 +778,13 @@ const initTransactions = async () => {
         return categories.map((cat) => ({ value: cat.category_id, label: cat.name }));
     };
 
-    const refreshFormCategories = async () => {
-        const type = byId('tx-type').value;
-        const options = await loadCategories(type);
-        fillSelect(byId('tx-category'), options, 'Без категории');
-    };
-
     const refreshFilterCategories = async () => {
-        const type = filterForm.querySelector('[name=\"type\"]').value;
+        const type = filterForm.querySelector('[name="type"]').value;
         const options = await loadCategories(type);
         fillSelect(byId('filter-category'), options, 'Все');
     };
+
+    let transactionModal = null;
 
     const loadTransactions = async () => {
         const params = new URLSearchParams(new FormData(filterForm));
@@ -709,17 +797,7 @@ const initTransactions = async () => {
                 editBtn.className = 'btn btn-outline btn-sm';
                 editBtn.textContent = 'Редактировать';
                 editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        transaction_id: tx.transaction_id,
-                        tx_type: tx.tx_type,
-                        account_id: tx.account_id,
-                        category_id: tx.category_id,
-                        amount: tx.amount,
-                        tx_date: tx.tx_date.replace(' ', 'T'),
-                        note: tx.note,
-                        merchant: tx.merchant_name,
-                    });
-                    title.textContent = `Редактирование: ${tx.category_name ?? 'Без категории'}`;
+                    transactionModal?.open({ transaction: tx });
                 });
 
                 const deleteBtn = document.createElement('button');
@@ -780,11 +858,9 @@ const initTransactions = async () => {
         );
     };
 
-    await refreshFormCategories();
     await refreshFilterCategories();
 
-    byId('tx-type').addEventListener('change', refreshFormCategories);
-    filterForm.querySelector('[name=\"type\"]').addEventListener('change', refreshFilterCategories);
+    filterForm.querySelector('[name="type"]').addEventListener('change', refreshFilterCategories);
 
     filterForm.addEventListener('input', loadTransactions);
 
@@ -794,33 +870,10 @@ const initTransactions = async () => {
         loadTransactions();
     });
 
-    addBtn.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новая операция';
-    });
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const data = serializeForm(form);
-        const id = data.transaction_id;
-        delete data.transaction_id;
-        if (id) {
-            await requestWithToast(
-                () => putJson(`/api/transactions/${id}`, data),
-                'Операция обновлена'
-            );
-        } else {
-            await requestWithToast(() => postJson('/api/transactions', data), 'Операция добавлена');
-        }
-        form.reset();
-        title.textContent = 'Новая операция';
-        await loadTransactions();
-    });
-
-    cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новая операция';
-    });
+    transactionModal = await initTransactionModal();
+    if (transactionModal) {
+        transactionModal.setOnSaved(loadTransactions);
+    }
 
     byId('transfer-form').addEventListener('submit', async (event) => {
         event.preventDefault();

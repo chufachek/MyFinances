@@ -15,6 +15,9 @@
             <?= $content ?>
         </main>
     </div>
+    <?php if (!isset($showSidebar) || $showSidebar !== false) : ?>
+        <?php require __DIR__ . '/partials/transaction-modal.php'; ?>
+    <?php endif; ?>
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
