@@ -69,20 +69,29 @@ const renderTable = (container, headers, rows) => {
     });
     table.appendChild(headerRow);
 
-    rows.forEach((row) => {
+    if (rows.length === 0) {
         const rowEl = document.createElement('div');
-        rowEl.className = 'table__row';
-        row.forEach((cell) => {
-            const cellEl = document.createElement('div');
-            if (cell instanceof HTMLElement) {
-                cellEl.appendChild(cell);
-            } else {
-                cellEl.innerHTML = cell;
-            }
-            rowEl.appendChild(cellEl);
-        });
+        rowEl.className = 'table__row table__row--empty';
+        const cellEl = document.createElement('div');
+        cellEl.textContent = 'Нет данных';
+        rowEl.appendChild(cellEl);
         table.appendChild(rowEl);
-    });
+    } else {
+        rows.forEach((row) => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'table__row';
+            row.forEach((cell) => {
+                const cellEl = document.createElement('div');
+                if (cell instanceof HTMLElement) {
+                    cellEl.appendChild(cell);
+                } else {
+                    cellEl.innerHTML = cell;
+                }
+                rowEl.appendChild(cellEl);
+            });
+            table.appendChild(rowEl);
+        });
+    }
 
     container.innerHTML = '';
     container.appendChild(table);
@@ -584,48 +593,25 @@ const initAuthForms = () => {
 };
 
 const initDashboard = async () => {
-    const lineCtx = byId('dashboard-line');
-    const categoryCtx = byId('dashboard-category');
-    const monthlyCtx = byId('dashboard-monthly');
-    const categoryList = byId('dashboard-category-list');
-    let lineChart;
-    let categoryChart;
-    let monthlyChart;
-
-    const formatDate = (date) => date.toISOString().slice(0, 10);
+    const budgetList = byId('dashboard-budget-list');
 
     const loadDashboard = async () => {
-        const chartLib = await ensureChart();
         const now = new Date();
         const month = now.toISOString().slice(0, 7);
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
         const dateFrom = `${month}-01`;
         const dateTo = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-        const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult] =
-            await Promise.allSettled([
-                getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
-                getJson('/api/transactions?limit=5'),
-                getJson(`/api/reports/expense-by-category?month=${month}`),
-                getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
-                monthlyCtx
-                    ? getJson(
-                          `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
-                              endMonth
-                          )}&groupBy=month&type=expense`
-                      )
-                    : Promise.resolve({ labels: [], expense: [] }),
-            ]);
+        const [summaryResult, txResult, categoryResult] = await Promise.allSettled([
+            getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
+            getJson('/api/transactions?limit=5'),
+            getJson(`/api/reports/expense-by-category?month=${month}`),
+        ]);
 
         if (
             summaryResult.status === 'rejected' ||
             txResult.status === 'rejected' ||
-            categoryResult.status === 'rejected' ||
-            dailyResult.status === 'rejected' ||
-            monthlyResult.status === 'rejected'
+            categoryResult.status === 'rejected'
         ) {
             showError('Не удалось загрузить все данные дашборда.');
         }
@@ -642,15 +628,6 @@ const initDashboard = async () => {
             categoryResult.status === 'fulfilled'
                 ? categoryResult.value
                 : { items: [] };
-        const daily =
-            dailyResult.status === 'fulfilled'
-                ? dailyResult.value
-                : { labels: [], income: [], expense: [] };
-        const monthly =
-            monthlyResult.status === 'fulfilled'
-                ? monthlyResult.value
-                : { labels: [], expense: [] };
-
         setText('summary-balance', formatCurrency(summary.balance));
         setText('summary-income', formatCurrency(summary.income));
         setText('summary-expense', formatCurrency(summary.expense));
@@ -681,120 +658,23 @@ const initDashboard = async () => {
 
         renderTable(byId('dashboard-transactions'), ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма'], rows);
 
-        if (categoryList) {
-            categoryList.innerHTML = '';
+        if (budgetList) {
+            budgetList.innerHTML = '';
             if (categoryData.items.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
-                empty.textContent = 'Нет расходов за период';
-                categoryList.appendChild(empty);
+                empty.textContent = 'Нет данных';
+                budgetList.appendChild(empty);
             } else {
-                categoryData.items.slice(0, 5).forEach((item) => {
+                categoryData.items.slice(0, 3).forEach((item) => {
                     const row = document.createElement('div');
                     row.className = 'stat-item';
                     row.innerHTML = `<span>${item.name}</span><span class="stat-item__value">${formatCurrency(
                         item.total
                     )}</span>`;
-                    categoryList.appendChild(row);
+                    budgetList.appendChild(row);
                 });
             }
-        }
-
-        if (lineCtx && chartLib) {
-            if (lineChart) {
-                lineChart.destroy();
-            }
-            lineChart = new chartLib(lineCtx, {
-                type: 'line',
-                data: {
-                    labels: daily.labels,
-                    datasets: [
-                        {
-                            label: 'Доходы',
-                            data: daily.income,
-                            borderColor: '#2f7a4d',
-                            backgroundColor: 'rgba(47, 122, 77, 0.15)',
-                            tension: 0.3,
-                            fill: true,
-                        },
-                        {
-                            label: 'Расходы',
-                            data: daily.expense,
-                            borderColor: '#b42318',
-                            backgroundColor: 'rgba(180, 35, 24, 0.1)',
-                            tension: 0.3,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
-                    },
-                },
-            });
-        }
-
-        if (categoryCtx && chartLib) {
-            if (categoryChart) {
-                categoryChart.destroy();
-            }
-            categoryChart = new chartLib(categoryCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: categoryData.items.map((item) => item.name),
-                    datasets: [
-                        {
-                            data: categoryData.items.map((item) => item.total),
-                            backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
-                    },
-                    cutout: '70%',
-                },
-            });
-        }
-
-        if (monthlyCtx && chartLib) {
-            if (monthlyChart) {
-                monthlyChart.destroy();
-            }
-            const monthLabels = monthly.labels.map((label) => {
-                const [year, monthValue] = label.split('-');
-                const date = new Date(Number(year), Number(monthValue) - 1, 1);
-                return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
-            });
-            monthlyChart = new chartLib(monthlyCtx, {
-                type: 'bar',
-                data: {
-                    labels: monthLabels,
-                    datasets: [
-                        {
-                            label: 'Расходы',
-                            data: monthly.expense,
-                            backgroundColor: 'rgba(47, 122, 77, 0.5)',
-                            borderColor: '#2f7a4d',
-                            borderWidth: 1,
-                            borderRadius: 8,
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
-                    },
-                },
-            });
         }
     };
 
