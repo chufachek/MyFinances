@@ -824,6 +824,7 @@ const initAccounts = async () => {
                 });
 
                 const actions = document.createElement('div');
+                actions.className = 'table__actions';
                 actions.style.display = 'flex';
                 actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
@@ -906,6 +907,7 @@ const initCategories = async () => {
                 });
 
                 const actions = document.createElement('div');
+                actions.className = 'table__actions';
                 actions.style.display = 'flex';
                 actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
@@ -994,6 +996,7 @@ const initTransactions = async () => {
                 });
 
                 const actions = document.createElement('div');
+                actions.className = 'table__actions';
                 actions.style.display = 'flex';
                 actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
@@ -1116,6 +1119,7 @@ const initBudgets = async () => {
                 });
 
                 const actions = document.createElement('div');
+                actions.className = 'table__actions';
                 actions.style.display = 'flex';
                 actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
