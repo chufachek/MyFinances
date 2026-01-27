@@ -45,19 +45,62 @@ const ensureToastContainer = () => {
     return container;
 };
 
+const toastVariants = {
+    success: { title: 'Успешно', icon: '✅', role: 'status' },
+    error: { title: 'Ошибка', icon: '⚠️', role: 'alert' },
+    warning: { title: 'Внимание', icon: '⚠️', role: 'status' },
+    info: { title: 'Информация', icon: 'ℹ️', role: 'status' },
+};
+
 const showToast = (message, variant = 'success') => {
     const container = ensureToastContainer();
     const toast = document.createElement('div');
+    const config = toastVariants[variant] ?? toastVariants.success;
     toast.className = `toast toast--${variant}`;
-    toast.innerHTML = `<strong>${variant === 'error' ? 'Ошибка' : 'Готово'}</strong><span>${message}</span>`;
+    toast.setAttribute('role', config.role);
+    toast.setAttribute('aria-live', 'polite');
+
+    const icon = document.createElement('span');
+    icon.className = 'toast__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = config.icon;
+
+    const content = document.createElement('div');
+    content.className = 'toast__content';
+
+    const title = document.createElement('strong');
+    title.className = 'toast__title';
+    title.textContent = config.title;
+
+    const text = document.createElement('span');
+    text.className = 'toast__message';
+    text.textContent = message;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'toast__close';
+    closeButton.setAttribute('aria-label', 'Закрыть уведомление');
+    closeButton.textContent = '✕';
+
+    content.appendChild(title);
+    content.appendChild(text);
+    toast.appendChild(icon);
+    toast.appendChild(content);
+    toast.appendChild(closeButton);
     container.appendChild(toast);
+
+    let removeTimeout;
+    const closeToast = () => {
+        toast.classList.remove('is-visible');
+        clearTimeout(removeTimeout);
+        setTimeout(() => toast.remove(), 300);
+    };
+
+    closeButton.addEventListener('click', closeToast);
     requestAnimationFrame(() => {
         toast.classList.add('is-visible');
     });
-    setTimeout(() => {
-        toast.classList.remove('is-visible');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+    removeTimeout = setTimeout(closeToast, 4500);
 };
 
 const requestWithToast = async (callback, successMessage) => {
