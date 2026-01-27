@@ -19,7 +19,7 @@
                             <span>На счёт</span>
                             <select name="to_account_id" id="transfer-quick-to" required></select>
                         </label>
-                        <label class="field">
+                        <div class="field">
                             <span>Сумма</span>
                             <div class="amount-control">
                                 <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
@@ -30,7 +30,7 @@
                                 <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
                                 <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
                             </div>
-                        </label>
+                        </div>
                         <label class="field">
                             <span>Комиссия</span>
                             <input type="number" step="0.01" name="fee" value="0">
