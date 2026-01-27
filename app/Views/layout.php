@@ -35,6 +35,7 @@
         <?php require __DIR__ . '/partials/transaction-modal.php'; ?>
         <?php require __DIR__ . '/partials/transfer-modal.php'; ?>
     <?php endif; ?>
+    <?php require __DIR__ . '/partials/confirm-modal.php'; ?>
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" data-chartjs></script>

@@ -103,15 +103,18 @@ const showToast = (message, variant = 'success') => {
     removeTimeout = setTimeout(closeToast, 4500);
 };
 
-const requestWithToast = async (callback, successMessage) => {
+const requestWithToast = async (callback, successMessage, options = {}) => {
+    const { showSuccess = true } = options;
     try {
         const result = await callback();
-        if (successMessage) {
-            showToast(successMessage, 'success');
-        } else if (result && result.message) {
-            showToast(result.message, 'success');
-        } else {
-            showToast('Операция выполнена', 'success');
+        if (showSuccess) {
+            if (successMessage) {
+                showToast(successMessage, 'success');
+            } else if (result && result.message) {
+                showToast(result.message, 'success');
+            } else {
+                showToast('Операция выполнена', 'success');
+            }
         }
         return result;
     } catch (error) {
@@ -120,7 +123,95 @@ const requestWithToast = async (callback, successMessage) => {
     }
 };
 
-const confirmAction = (message) => window.confirm(message);
+const closeModalWithToast = (modal, message, variant = 'success') => {
+    if (!modal) {
+        showToast(message, variant);
+        return;
+    }
+    const instance = getBootstrapModal(modal);
+    if (instance) {
+        const handleHidden = () => {
+            modal.removeEventListener('hidden.bs.modal', handleHidden);
+            showToast(message, variant);
+        };
+        modal.addEventListener('hidden.bs.modal', handleHidden);
+        instance.hide();
+        return;
+    }
+    closeModal(modal);
+    showToast(message, variant);
+};
+
+const confirmAction = (message, options = {}) => {
+    const modal = byId('confirm-modal');
+    if (!modal) {
+        return Promise.resolve(window.confirm(message));
+    }
+
+    const title = byId('confirm-modal-title');
+    const text = byId('confirm-modal-message');
+    const confirmButton = byId('confirm-modal-confirm');
+    const cancelButton = byId('confirm-modal-cancel');
+    const {
+        titleText = 'Подтверждение',
+        confirmText = 'Подтвердить',
+        cancelText = 'Отмена',
+    } = options;
+
+    if (title) {
+        title.textContent = titleText;
+    }
+    if (text) {
+        text.textContent = message;
+    }
+    if (confirmButton) {
+        confirmButton.textContent = confirmText;
+    }
+    if (cancelButton) {
+        cancelButton.textContent = cancelText;
+    }
+
+    return new Promise((resolve) => {
+        let resolved = false;
+        const safeResolve = (value) => {
+            if (resolved) {
+                return;
+            }
+            resolved = true;
+            resolve(value);
+        };
+
+        const cleanup = () => {
+            confirmButton?.removeEventListener('click', handleConfirm);
+            cancelButton?.removeEventListener('click', handleCancel);
+            modal.removeEventListener('hidden.bs.modal', handleHidden);
+        };
+
+        const handleConfirm = (event) => {
+            event.preventDefault();
+            cleanup();
+            safeResolve(true);
+            closeModal(modal);
+        };
+
+        const handleCancel = (event) => {
+            event.preventDefault();
+            cleanup();
+            safeResolve(false);
+            closeModal(modal);
+        };
+
+        const handleHidden = () => {
+            cleanup();
+            safeResolve(false);
+        };
+
+        confirmButton?.addEventListener('click', handleConfirm);
+        cancelButton?.addEventListener('click', handleCancel);
+        modal.addEventListener('hidden.bs.modal', handleHidden);
+        openModal(modal);
+    });
+};
 
 const createIconButton = ({ icon, label, variant = 'outline' }) => {
     const btn = document.createElement('button');
@@ -547,14 +638,17 @@ const initTransactionModal = async () => {
         const id = data.transaction_id;
         delete data.transaction_id;
         if (id) {
-            await requestWithToast(() => putJson(`/api/transactions/${id}`, data), 'Операция обновлена');
+            await requestWithToast(() => putJson(`/api/transactions/${id}`, data), 'Операция обновлена', { showSuccess: false });
+            closeModalWithToast(modal, 'Операция обновлена');
         } else {
+            const message = data.tx_type === 'income' ? 'Доход добавлен' : 'Расход добавлен';
             await requestWithToast(
                 () => postJson('/api/transactions', data),
-                data.tx_type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
+                message,
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, message);
         }
-        closeModal(modal);
         if (onSaved) {
             await onSaved();
         }
@@ -633,8 +727,8 @@ const initTransferModal = ({ onSaved } = {}) => {
             amountInput.focus();
             return;
         }
-        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
-        closeModal(modal);
+        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен', { showSuccess: false });
+        closeModalWithToast(modal, 'Перевод выполнен');
         if (onSaved) {
             await onSaved();
         }
@@ -736,11 +830,13 @@ const initIncomeExpenseModals = async ({ onSaved } = {}) => {
                 amountInput.focus();
                 return;
             }
+            const message = config.type === 'income' ? 'Доход добавлен' : 'Расход добавлен';
             await requestWithToast(
                 () => postJson('/api/transactions', data),
-                config.type === 'income' ? 'Доход добавлен' : 'Расход добавлен'
+                message,
+                { showSuccess: false }
             );
-            closeModal(modal);
+            closeModalWithToast(modal, message);
             if (onSaved) {
                 await onSaved();
             }
@@ -1141,7 +1237,11 @@ const initAccounts = async () => {
                         openDeleteModal(acc);
                         return;
                     }
-                    if (!confirmAction(`Удалить счёт «${acc.name}»?`)) {
+                    const confirmed = await confirmAction(`Удалить счёт «${acc.name}»?`, {
+                        titleText: 'Удаление счёта',
+                        confirmText: 'Удалить',
+                    });
+                    if (!confirmed) {
                         return;
                     }
                     await requestWithToast(() => deleteJson(`/api/accounts/${acc.account_id}`), 'Счёт удалён');
@@ -1172,13 +1272,15 @@ const initAccounts = async () => {
         if (id) {
             await requestWithToast(
                 () => putJson(`/api/accounts/${id}`, data),
-                'Счёт обновлён'
+                'Счёт обновлён',
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, 'Счёт обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан');
+            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан', { showSuccess: false });
+            closeModalWithToast(modal, 'Счёт создан');
         }
         resetForm();
-        closeModal(modal);
         await load();
     });
 
@@ -1288,7 +1390,11 @@ const initCategories = async () => {
 
                     const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить категорию', variant: 'outline' });
                     deleteBtn.addEventListener('click', async () => {
-                        if (!confirmAction(`Удалить категорию «${cat.name}»?`)) {
+                        const confirmed = await confirmAction(`Удалить категорию «${cat.name}»?`, {
+                            titleText: 'Удаление категории',
+                            confirmText: 'Удалить',
+                        });
+                        if (!confirmed) {
                             return;
                         }
                         await requestWithToast(
@@ -1313,13 +1419,15 @@ const initCategories = async () => {
         if (id) {
             await requestWithToast(
                 () => putJson(`/api/categories/${id}`, data),
-                'Категория обновлена'
+                'Категория обновлена',
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, 'Категория обновлена');
         } else {
-            await requestWithToast(() => postJson('/api/categories', data), 'Категория создана');
+            await requestWithToast(() => postJson('/api/categories', data), 'Категория создана', { showSuccess: false });
+            closeModalWithToast(modal, 'Категория создана');
         }
         resetForm();
-        closeModal(modal);
         await load();
     });
 
@@ -1382,7 +1490,11 @@ const initTransactions = async () => {
 
                 const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить операцию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction('Удалить операцию?')) {
+                    const confirmed = await confirmAction('Удалить операцию?', {
+                        titleText: 'Удаление операции',
+                        confirmText: 'Удалить',
+                    });
+                    if (!confirmed) {
                         return;
                     }
                     await requestWithToast(
@@ -1417,7 +1529,11 @@ const initTransactions = async () => {
             transfers.map((tr) => {
                 const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить перевод', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction('Удалить перевод?')) {
+                    const confirmed = await confirmAction('Удалить перевод?', {
+                        titleText: 'Удаление перевода',
+                        confirmText: 'Удалить',
+                    });
+                    if (!confirmed) {
                         return;
                     }
                     await requestWithToast(
@@ -1465,12 +1581,36 @@ const initTransactions = async () => {
 const initBudgets = async () => {
     const table = byId('budgets-table');
     const monthPicker = byId('budgets-month');
+    const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
     const cancel = byId('budgets-cancel');
+    const addButton = byId('budgets-add');
 
     const { categories } = await getJson('/api/categories?type=expense');
     fillSelect(byId('budgets-category'), categories.map((cat) => ({ value: cat.category_id, label: cat.name })), 'Выберите');
+
+    const resetForm = () => {
+        form.reset();
+        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+        setFormValues(form, { period_month: month });
+        title.textContent = 'Новый бюджет';
+    };
+
+    const openFormModal = (budget = null) => {
+        if (budget) {
+            setFormValues(form, {
+                budget_id: budget.budget_id,
+                category_id: budget.category_id,
+                period_month: budget.period_month,
+                limit_amount: budget.limit_amount,
+            });
+            title.textContent = `Редактирование: ${budget.category_name}`;
+        } else {
+            resetForm();
+        }
+        openModal(modal);
+    };
 
     const load = async () => {
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
@@ -1492,19 +1632,16 @@ const initBudgets = async () => {
 
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        budget_id: b.budget_id,
-                        category_id: b.category_id,
-                        period_month: b.period_month,
-                        limit_amount: b.limit_amount,
-                    });
-                    title.textContent = `Редактирование: ${b.category_name}`;
-                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    openFormModal(b);
                 });
 
                 const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction('Удалить бюджет?')) {
+                    const confirmed = await confirmAction('Удалить бюджет?', {
+                        titleText: 'Удаление бюджета',
+                        confirmText: 'Удалить',
+                    });
+                    if (!confirmed) {
                         return;
                     }
                     await requestWithToast(
@@ -1533,29 +1670,64 @@ const initBudgets = async () => {
         if (id) {
             await requestWithToast(
                 () => putJson(`/api/budgets/${id}`, data),
-                'Бюджет обновлён'
+                'Бюджет обновлён',
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, 'Бюджет обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан');
+            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
+            closeModalWithToast(modal, 'Бюджет создан');
         }
-        form.reset();
-        title.textContent = 'Новый бюджет';
+        resetForm();
         await load();
     });
 
     cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новый бюджет';
+        resetForm();
+        closeModal(modal);
     });
+
+    if (addButton) {
+        addButton.addEventListener('click', () => openFormModal());
+    }
+
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', resetForm);
+    }
 
     await load();
 };
 
 const initGoals = async () => {
     const list = byId('goals-list');
+    const modal = byId('goals-modal');
     const form = byId('goals-form');
     const title = byId('goals-form-title');
     const cancel = byId('goals-cancel');
+    const addButton = byId('goals-add');
+
+    const resetForm = () => {
+        form.reset();
+        setFormValues(form, { goal_id: '' });
+        title.textContent = 'Новая цель';
+    };
+
+    const openFormModal = (goal = null) => {
+        if (goal) {
+            setFormValues(form, {
+                goal_id: goal.goal_id,
+                name: goal.name,
+                target_amount: goal.target_amount,
+                current_amount: goal.current_amount,
+                due_date: goal.due_date ?? '',
+                status: goal.status,
+            });
+            title.textContent = `Редактирование: ${goal.name}`;
+        } else {
+            resetForm();
+        }
+        openModal(modal);
+    };
 
     const renderGoals = async () => {
         const { goals } = await getJson('/api/goals');
@@ -1584,21 +1756,16 @@ const initGoals = async () => {
 
             const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
             editBtn.addEventListener('click', () => {
-                setFormValues(form, {
-                    goal_id: goal.goal_id,
-                    name: goal.name,
-                    target_amount: goal.target_amount,
-                    current_amount: goal.current_amount,
-                    due_date: goal.due_date ?? '',
-                    status: goal.status,
-                });
-                title.textContent = `Редактирование: ${goal.name}`;
-                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                openFormModal(goal);
             });
 
             const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить цель', variant: 'outline' });
             deleteBtn.addEventListener('click', async () => {
-                if (!confirmAction('Удалить цель?')) {
+                const confirmed = await confirmAction('Удалить цель?', {
+                    titleText: 'Удаление цели',
+                    confirmText: 'Удалить',
+                });
+                if (!confirmed) {
                     return;
                 }
                 await requestWithToast(
@@ -1620,19 +1787,28 @@ const initGoals = async () => {
         const id = data.goal_id;
         delete data.goal_id;
         if (id) {
-            await requestWithToast(() => putJson(`/api/goals/${id}`, data), 'Цель обновлена');
+            await requestWithToast(() => putJson(`/api/goals/${id}`, data), 'Цель обновлена', { showSuccess: false });
+            closeModalWithToast(modal, 'Цель обновлена');
         } else {
-            await requestWithToast(() => postJson('/api/goals', data), 'Цель добавлена');
+            await requestWithToast(() => postJson('/api/goals', data), 'Цель добавлена', { showSuccess: false });
+            closeModalWithToast(modal, 'Цель добавлена');
         }
-        form.reset();
-        title.textContent = 'Новая цель';
+        resetForm();
         await renderGoals();
     });
 
     cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новая цель';
+        resetForm();
+        closeModal(modal);
     });
+
+    if (addButton) {
+        addButton.addEventListener('click', () => openFormModal());
+    }
+
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', resetForm);
+    }
 
     await renderGoals();
 };
