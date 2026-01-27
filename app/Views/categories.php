@@ -5,7 +5,9 @@
             <p class="text-muted">Упорядочьте доходы и расходы по категориям.</p>
         </div>
         <div class="page__actions">
-            <button class="btn btn-primary" id="categories-add">Добавить категорию</button>
+            <button class="btn btn-primary" id="categories-add" type="button" data-bs-toggle="modal" data-bs-target="#categories-modal">
+                Создать категорию
+            </button>
         </div>
     </header>
 

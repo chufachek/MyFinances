@@ -13,13 +13,13 @@ class CategoriesController
     {
         $type = isset($_GET['type']) ? $_GET['type'] : null;
         $pdo = Database::connection();
-        $query = 'SELECT * FROM categories WHERE user_id = :user_id';
+        $query = 'SELECT * FROM categories WHERE (user_id = :user_id OR is_default = 1)';
         $params = ['user_id' => Auth::userId()];
         if ($type) {
             $query .= ' AND category_type = :type';
             $params['type'] = $type;
         }
-        $query .= ' ORDER BY is_active DESC, name';
+        $query .= ' ORDER BY is_default DESC, is_active DESC, name';
         $stmt = $pdo->prepare($query);
         $stmt->execute($params);
         Response::json(['categories' => $stmt->fetchAll()]);
@@ -56,7 +56,7 @@ class CategoriesController
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE categories SET name = :name, category_type = :type, is_active = :active WHERE category_id = :id AND user_id = :user_id');
+        $stmt = $pdo->prepare('UPDATE categories SET name = :name, category_type = :type, is_active = :active WHERE category_id = :id AND user_id = :user_id AND is_default = 0');
         $stmt->execute([
             'name' => $name,
             'type' => $type,
@@ -70,7 +70,7 @@ class CategoriesController
     public function delete($id)
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE categories SET is_active = 0 WHERE category_id = :id AND user_id = :user_id');
+        $stmt = $pdo->prepare('UPDATE categories SET is_active = 0 WHERE category_id = :id AND user_id = :user_id AND is_default = 0');
         $stmt->execute(['id' => $id, 'user_id' => Auth::userId()]);
         Response::json(['success' => true]);
     }

@@ -5,7 +5,9 @@
             <p class="text-muted">Управление счетами и расчетными балансами.</p>
         </div>
         <div class="page__actions">
-            <button class="btn btn-primary" id="accounts-add">Добавить счёт</button>
+            <button class="btn btn-primary" id="accounts-add" type="button" data-bs-toggle="modal" data-bs-target="#accounts-modal">
+                Добавить счёт
+            </button>
         </div>
     </header>
 
