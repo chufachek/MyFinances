@@ -5,6 +5,13 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount);
 };
 
+const accountTypeLabels = {
+    cash: 'Наличные',
+    card: 'Карта',
+    bank: 'Банк',
+    other: 'Другое',
+};
+
 const byId = (id) => document.getElementById(id);
 const setText = (id, value) => {
     const el = byId(id);
@@ -56,6 +63,17 @@ const requestWithToast = async (callback, successMessage) => {
     }
 };
 
+const confirmAction = (message) => window.confirm(message);
+
+const createIconButton = ({ icon, label, variant = 'outline' }) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn btn-${variant} btn-sm icon-btn`;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = `<span aria-hidden="true">${icon}</span>`;
+    return btn;
+};
+
 const renderTable = (container, headers, rows) => {
     const table = document.createElement('div');
     table.className = 'table';
@@ -95,6 +113,37 @@ const renderTable = (container, headers, rows) => {
 
     container.innerHTML = '';
     container.appendChild(table);
+};
+
+const setActiveSidebarLink = () => {
+    const currentPage = document.body.dataset.page;
+    if (!currentPage) {
+        return;
+    }
+    document.querySelectorAll('.sidebar__link').forEach((link) => {
+        const isActive = link.dataset.page === currentPage;
+        link.classList.toggle('is-active', isActive);
+        if (isActive) {
+            link.setAttribute('aria-current', 'page');
+        } else {
+            link.removeAttribute('aria-current');
+        }
+    });
+};
+
+const setupSidebarToggle = () => {
+    const toggleButtons = document.querySelectorAll('[data-action="toggle-sidebar"]');
+    const closeButtons = document.querySelectorAll('[data-action="close-sidebar"]');
+    const links = document.querySelectorAll('.sidebar__link');
+    if (!toggleButtons.length) {
+        return;
+    }
+    const closeSidebar = () => document.body.classList.remove('sidebar-open');
+    toggleButtons.forEach((btn) => btn.addEventListener('click', () => {
+        document.body.classList.toggle('sidebar-open');
+    }));
+    closeButtons.forEach((btn) => btn.addEventListener('click', closeSidebar));
+    links.forEach((link) => link.addEventListener('click', closeSidebar));
 };
 
 const serializeForm = (form) => Object.fromEntries(new FormData(form).entries());
@@ -146,25 +195,13 @@ const toggleChartEmptyState = (canvas, isEmpty) => {
 
 let chartLibraryPromise;
 const ensureChart = () => {
-    if (window.Chart) {
-        return Promise.resolve(window.Chart);
+    if (typeof Chart !== 'undefined') {
+        return Promise.resolve(Chart);
     }
     if (!chartLibraryPromise) {
-        chartLibraryPromise = new Promise((resolve) => {
-            const existing = document.querySelector('script[data-chartjs]');
-            if (existing) {
-                existing.addEventListener('load', () => resolve(window.Chart ?? null), { once: true });
-                existing.addEventListener('error', () => resolve(null), { once: true });
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-            script.async = true;
-            script.dataset.chartjs = 'true';
-            script.onload = () => resolve(window.Chart ?? null);
-            script.onerror = () => resolve(null);
-            document.head.appendChild(script);
-        });
+        chartLibraryPromise = import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js')
+            .then((mod) => mod.Chart ?? mod.default ?? mod)
+            .catch(() => null);
     }
     return chartLibraryPromise;
 };
@@ -516,20 +553,6 @@ const initTransferModal = ({ onSaved } = {}) => {
         }
     };
 
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const data = serializeForm(form);
-        if (data.from_account_id === data.to_account_id) {
-            showError('Выберите разные счета для перевода.');
-            return;
-        }
-        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
-        closeModal(modal);
-        if (onSaved) {
-            await onSaved();
-        }
-    });
-
     modal.querySelectorAll('[data-amount-delta]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const delta = Number(btn.dataset.amountDelta || 0);
@@ -537,6 +560,25 @@ const initTransferModal = ({ onSaved } = {}) => {
             const next = Math.max(0, current + delta);
             amountInput.value = next ? next.toFixed(2) : '';
         });
+    });
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = serializeForm(form);
+        if (data.from_account_id === data.to_account_id) {
+            showError('Выберите разные счета для перевода.');
+            return;
+        }
+        if (Number(data.amount || 0) <= 0) {
+            showError('Сумма должна быть больше нуля.');
+            amountInput.focus();
+            return;
+        }
+        await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
+        closeModal(modal);
+        if (onSaved) {
+            await onSaved();
+        }
     });
 
     document.querySelectorAll('[data-action="open-transfer"]').forEach((btn) => {
@@ -701,25 +743,48 @@ const initAuthForms = () => {
 };
 
 const initDashboard = async () => {
-    const budgetList = byId('dashboard-budget-list');
+    const lineCtx = byId('dashboard-line');
+    const categoryCtx = byId('dashboard-category');
+    const monthlyCtx = byId('dashboard-monthly');
+    const categoryList = byId('dashboard-category-list');
+    let lineChart;
+    let categoryChart;
+    let monthlyChart;
+
+    const formatDate = (date) => date.toISOString().slice(0, 10);
 
     const loadDashboard = async () => {
+        const chartLib = await ensureChart();
         const now = new Date();
         const month = now.toISOString().slice(0, 7);
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
         const dateFrom = `${month}-01`;
         const dateTo = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-        const [summaryResult, txResult, categoryResult] = await Promise.allSettled([
-            getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
-            getJson('/api/transactions?limit=5'),
-            getJson(`/api/reports/expense-by-category?month=${month}`),
-        ]);
+        const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult] =
+            await Promise.allSettled([
+                getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
+                getJson('/api/transactions?limit=5'),
+                getJson(`/api/reports/expense-by-category?month=${month}`),
+                getJson(`/api/reports/dynamics?dateFrom=${dateFrom}&dateTo=${dateTo}&groupBy=day`),
+                monthlyCtx
+                    ? getJson(
+                          `/api/reports/dynamics?dateFrom=${formatDate(startMonth)}&dateTo=${formatDate(
+                              endMonth
+                          )}&groupBy=month&type=expense`
+                      )
+                    : Promise.resolve({ labels: [], expense: [] }),
+            ]);
 
         if (
             summaryResult.status === 'rejected' ||
             txResult.status === 'rejected' ||
-            categoryResult.status === 'rejected'
+            categoryResult.status === 'rejected' ||
+            dailyResult.status === 'rejected' ||
+            monthlyResult.status === 'rejected'
         ) {
             showError('Не удалось загрузить все данные дашборда.');
         }
@@ -736,6 +801,15 @@ const initDashboard = async () => {
             categoryResult.status === 'fulfilled'
                 ? categoryResult.value
                 : { items: [] };
+        const daily =
+            dailyResult.status === 'fulfilled'
+                ? dailyResult.value
+                : { labels: [], income: [], expense: [] };
+        const monthly =
+            monthlyResult.status === 'fulfilled'
+                ? monthlyResult.value
+                : { labels: [], expense: [] };
+
         setText('summary-balance', formatCurrency(summary.balance));
         setText('summary-income', formatCurrency(summary.income));
         setText('summary-expense', formatCurrency(summary.expense));
@@ -766,21 +840,136 @@ const initDashboard = async () => {
 
         renderTable(byId('dashboard-transactions'), ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма'], rows);
 
-        if (budgetList) {
-            budgetList.innerHTML = '';
+        if (categoryList) {
+            categoryList.innerHTML = '';
             if (categoryData.items.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
                 empty.textContent = getRandomEmptyMessage();
-                budgetList.appendChild(empty);
+                categoryList.appendChild(empty);
             } else {
-                categoryData.items.slice(0, 3).forEach((item) => {
+                categoryData.items.slice(0, 5).forEach((item) => {
                     const row = document.createElement('div');
                     row.className = 'stat-item';
                     row.innerHTML = `<span>${item.name}</span><span class="stat-item__value">${formatCurrency(
                         item.total
                     )}</span>`;
-                    budgetList.appendChild(row);
+                    categoryList.appendChild(row);
+                });
+            }
+        }
+
+        if (lineCtx && chartLib) {
+            if (lineChart) {
+                lineChart.destroy();
+            }
+            const hasData =
+                daily.labels.length > 0 &&
+                (daily.income.some((value) => Number(value) > 0) ||
+                    daily.expense.some((value) => Number(value) > 0));
+            toggleChartEmptyState(lineCtx, !hasData);
+            if (hasData) {
+                lineChart = new chartLib(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: daily.labels,
+                        datasets: [
+                            {
+                                label: 'Доходы',
+                                data: daily.income,
+                                borderColor: '#2f7a4d',
+                                backgroundColor: 'rgba(47, 122, 77, 0.15)',
+                                tension: 0.3,
+                                fill: true,
+                            },
+                            {
+                                label: 'Расходы',
+                                data: daily.expense,
+                                borderColor: '#b42318',
+                                backgroundColor: 'rgba(180, 35, 24, 0.1)',
+                                tension: 0.3,
+                                fill: true,
+                            },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                        },
+                    },
+                });
+            }
+        }
+
+        if (categoryCtx && chartLib) {
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            const categoryValues = categoryData.items.map((item) => item.total);
+            const hasData = categoryValues.some((value) => Number(value) > 0);
+            toggleChartEmptyState(categoryCtx, !hasData);
+            if (hasData) {
+                categoryChart = new chartLib(categoryCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: categoryData.items.map((item) => item.name),
+                        datasets: [
+                            {
+                                data: categoryValues,
+                                backgroundColor: ['#2f7a4d', '#4ecf7d', '#6fdd9d', '#b6f0c9', '#d9f7e3', '#2f9e6c'],
+                            },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                        },
+                        cutout: '70%',
+                    },
+                });
+            }
+        }
+
+        if (monthlyCtx && chartLib) {
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+            const monthLabels = monthly.labels.map((label) => {
+                const [year, monthValue] = label.split('-');
+                const date = new Date(Number(year), Number(monthValue) - 1, 1);
+                return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' });
+            });
+            const hasData =
+                monthLabels.length > 0 &&
+                monthly.expense.some((value) => Number(value) > 0);
+            toggleChartEmptyState(monthlyCtx, !hasData);
+            if (hasData) {
+                monthlyChart = new chartLib(monthlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: monthLabels,
+                        datasets: [
+                            {
+                                label: 'Расходы',
+                                data: monthly.expense,
+                                backgroundColor: 'rgba(47, 122, 77, 0.5)',
+                                borderColor: '#2f7a4d',
+                                borderWidth: 1,
+                                borderRadius: 8,
+                            },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                        },
+                    },
                 });
             }
         }
@@ -800,6 +989,7 @@ const initAccounts = async () => {
     const form = byId('accounts-form');
     const title = byId('accounts-form-title');
     const cancel = byId('accounts-cancel');
+    const addButton = byId('accounts-add');
 
     const load = async () => {
         const { accounts } = await getJson('/api/accounts');
@@ -807,9 +997,7 @@ const initAccounts = async () => {
             table,
             ['Название', 'Тип', 'Валюта', 'Баланс', 'Статус', 'Действия'],
             accounts.map((acc) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         account_id: acc.account_id,
@@ -820,12 +1008,14 @@ const initAccounts = async () => {
                         is_active: acc.is_active,
                     });
                     title.textContent = `Редактирование: ${acc.name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Скрыть';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть счёт', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction(`Скрыть счёт «${acc.name}»?`)) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/accounts/${acc.account_id}`),
                         'Счёт скрыт'
@@ -835,13 +1025,11 @@ const initAccounts = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [
                     acc.name,
-                    acc.account_type,
+                    accountTypeLabels[acc.account_type] ?? acc.account_type,
                     acc.currency_code,
                     formatCurrency(acc.balance),
                     acc.is_active ? 'Активен' : 'Скрыт',
@@ -874,6 +1062,14 @@ const initAccounts = async () => {
         title.textContent = 'Новый счёт';
     });
 
+    if (addButton) {
+        addButton.addEventListener('click', () => {
+            form.reset();
+            title.textContent = 'Новый счёт';
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+
     await load();
 };
 
@@ -892,9 +1088,7 @@ const initCategories = async () => {
             table,
             ['Название', 'Тип', 'Статус', 'Действия'],
             categories.map((cat) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         category_id: cat.category_id,
@@ -903,12 +1097,14 @@ const initCategories = async () => {
                         is_active: cat.is_active,
                     });
                     title.textContent = `Редактирование: ${cat.name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Скрыть';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть категорию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction(`Скрыть категорию «${cat.name}»?`)) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/categories/${cat.category_id}`),
                         'Категория скрыта'
@@ -918,8 +1114,6 @@ const initCategories = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [cat.name, cat.category_type === 'income' ? 'Доход' : 'Расход', cat.is_active ? 'Активна' : 'Скрыта', actions];
@@ -987,17 +1181,16 @@ const initTransactions = async () => {
             table,
             ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма', 'Комментарий', 'Действия'],
             transactions.map((tx) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     transactionModal?.open({ transaction: tx });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить операцию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить операцию?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/transactions/${tx.transaction_id}`),
                         'Операция удалена'
@@ -1007,8 +1200,6 @@ const initTransactions = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [
@@ -1030,10 +1221,11 @@ const initTransactions = async () => {
             transfersTable,
             ['Дата', 'Откуда', 'Куда', 'Сумма', 'Комиссия', 'Комментарий', 'Действия'],
             transfers.map((tr) => {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить перевод', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить перевод?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/transfers/${tr.transfer_id}`),
                         'Перевод удалён'
@@ -1104,9 +1296,7 @@ const initBudgets = async () => {
                 bar.style.width = `${percent}%`;
                 progress.appendChild(bar);
 
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         budget_id: b.budget_id,
@@ -1115,12 +1305,14 @@ const initBudgets = async () => {
                         limit_amount: b.limit_amount,
                     });
                     title.textContent = `Редактирование: ${b.category_name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить бюджет?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/budgets/${b.budget_id}`),
                         'Бюджет удалён'
@@ -1130,8 +1322,6 @@ const initBudgets = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), progress, actions];
@@ -1198,9 +1388,7 @@ const initGoals = async () => {
             const actions = document.createElement('div');
             actions.className = 'form-actions';
 
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn btn-outline btn-sm';
-            editBtn.textContent = 'Редактировать';
+            const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
             editBtn.addEventListener('click', () => {
                 setFormValues(form, {
                     goal_id: goal.goal_id,
@@ -1211,12 +1399,14 @@ const initGoals = async () => {
                     status: goal.status,
                 });
                 title.textContent = `Редактирование: ${goal.name}`;
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-outline btn-sm';
-            deleteBtn.textContent = 'Удалить';
+            const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить цель', variant: 'outline' });
             deleteBtn.addEventListener('click', async () => {
+                if (!confirmAction('Удалить цель?')) {
+                    return;
+                }
                 await requestWithToast(
                     () => deleteJson(`/api/goals/${goal.goal_id}`),
                     'Цель удалена'
@@ -1280,12 +1470,12 @@ const initReports = async () => {
         const labels = pie.items.map((item) => item.name);
         const values = pie.items.map((item) => item.total);
 
+        if (pieChart) {
+            pieChart.destroy();
+        }
         const pieHasData = values.some((value) => Number(value) > 0);
         toggleChartEmptyState(pieCtx, !pieHasData);
-        if (pieHasData && chartLib && pieCtx) {
-            if (pieChart) {
-                pieChart.destroy();
-            }
+        if (pieHasData && chartLib) {
             pieChart = new chartLib(pieCtx, {
                 type: 'doughnut',
                 data: {
@@ -1298,9 +1488,6 @@ const initReports = async () => {
                     ],
                 },
             });
-        } else if (pieChart) {
-            pieChart.destroy();
-            pieChart = null;
         }
 
         renderTable(
@@ -1313,15 +1500,15 @@ const initReports = async () => {
             })
         );
 
+        if (lineChart) {
+            lineChart.destroy();
+        }
         const lineHasData =
             line.labels.length > 0 &&
             (line.income.some((value) => Number(value) > 0) ||
                 line.expense.some((value) => Number(value) > 0));
         toggleChartEmptyState(lineCtx, !lineHasData);
-        if (lineHasData && chartLib && lineCtx) {
-            if (lineChart) {
-                lineChart.destroy();
-            }
+        if (lineHasData && chartLib) {
             lineChart = new chartLib(lineCtx, {
                 type: 'line',
                 data: {
@@ -1342,9 +1529,6 @@ const initReports = async () => {
                     ],
                 },
             });
-        } else if (lineChart) {
-            lineChart.destroy();
-            lineChart = null;
         }
     };
 
@@ -1358,6 +1542,8 @@ const page = document.body.dataset.page;
 setupLogout();
 initAuthForms();
 initSelectEnhancements();
+setActiveSidebarLink();
+setupSidebarToggle();
 
 if (page === 'dashboard') {
     initDashboard().catch(console.error);
