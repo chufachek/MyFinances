@@ -277,7 +277,7 @@ a {
     gap: 8px;
     align-items: center;
     background: transparent;
-    background-color: #f6f8f7;
+    background-color: #f6f8f7 !important;
     padding: 0;
     box-shadow: none;
     flex-wrap: wrap;
