@@ -21,6 +21,6 @@
             </label>
             <button class="btn btn-primary" type="submit">Создать аккаунт</button>
         </form>
-        <p class="text-muted">Уже есть аккаунт? <a class="link" href="/login">Войти</a></p>
+        <p class="text-muted">Уже есть аккаунт? <a class="link" href="<?= htmlspecialchars(($basePath ?? '') . '/login', ENT_QUOTES) ?>">Войти</a></p>
     </div>
 </section>
