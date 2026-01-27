@@ -1717,10 +1717,13 @@ const initBudgets = async () => {
                 limit_amount: budget.limit_amount,
             });
             title.textContent = `Редактирование: ${budget.category_name}`;
-        } else {
-            resetForm();
+            openModal(modal);
+            return;
         }
-        openModal(modal);
+        resetForm();
+        requestAnimationFrame(() => {
+            openModal(modal);
+        });
     };
 
     const load = async () => {
@@ -1832,10 +1835,13 @@ const initGoals = async () => {
                 status: goal.status,
             });
             title.textContent = `Редактирование: ${goal.name}`;
-        } else {
-            resetForm();
+            openModal(modal);
+            return;
         }
-        openModal(modal);
+        resetForm();
+        requestAnimationFrame(() => {
+            openModal(modal);
+        });
     };
 
     const renderGoals = async () => {
