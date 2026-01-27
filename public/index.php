@@ -73,7 +73,7 @@ $router->get('/register', static function () use ($render) {
 
 $router->get('/dashboard', static function () use ($render, $authRequired) {
     $authRequired();
-    $render('dashboard', ['title' => 'Дашборд', 'page' => 'dashboard']);
+    $render('dashboard', ['title' => 'Сводка', 'page' => 'dashboard']);
 });
 $router->get('/transactions', static function () use ($render, $authRequired) {
     $authRequired();

@@ -4,6 +4,9 @@
             <h1>Счета</h1>
             <p class="text-muted">Управление счетами и расчетными балансами.</p>
         </div>
+        <div class="page__actions">
+            <button class="btn btn-primary" id="accounts-add">Добавить счёт</button>
+        </div>
     </header>
 
     <div class="panel">

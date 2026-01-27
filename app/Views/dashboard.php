@@ -1,7 +1,7 @@
 <section class="page">
     <header class="page__header">
         <div>
-            <h1>Dashboard (главная панель)</h1>
+            <h1>Сводка</h1>
             <p class="text-muted">Сводка по финансам за выбранный период.</p>
         </div>
     </header>

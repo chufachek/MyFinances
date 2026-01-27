@@ -12,8 +12,22 @@
     <div class="app-shell">
         <?php if (!isset($showSidebar) || $showSidebar !== false) : ?>
             <?php require __DIR__ . '/partials/menu.php'; ?>
+            <div class="sidebar__backdrop" data-action="close-sidebar"></div>
         <?php endif; ?>
         <main class="content">
+            <?php if (!isset($showSidebar) || $showSidebar !== false) : ?>
+                <div class="mobile-header">
+                    <button class="sidebar__toggle" type="button" data-action="toggle-sidebar" aria-label="Открыть меню">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <a class="mobile-header__brand" href="/dashboard">
+                        <span class="brand__dot"></span>
+                        <span>МоиФинансы</span>
+                    </a>
+                </div>
+            <?php endif; ?>
             <?= $content ?>
         </main>
     </div>

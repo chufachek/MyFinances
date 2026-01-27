@@ -5,6 +5,13 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount);
 };
 
+const accountTypeLabels = {
+    cash: 'Наличные',
+    card: 'Карта',
+    bank: 'Банк',
+    other: 'Другое',
+};
+
 const byId = (id) => document.getElementById(id);
 const setText = (id, value) => {
     const el = byId(id);
@@ -56,6 +63,17 @@ const requestWithToast = async (callback, successMessage) => {
     }
 };
 
+const confirmAction = (message) => window.confirm(message);
+
+const createIconButton = ({ icon, label, variant = 'outline' }) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn btn-${variant} btn-sm icon-btn`;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = `<span aria-hidden="true">${icon}</span>`;
+    return btn;
+};
+
 const renderTable = (container, headers, rows) => {
     const table = document.createElement('div');
     table.className = 'table';
@@ -95,6 +113,37 @@ const renderTable = (container, headers, rows) => {
 
     container.innerHTML = '';
     container.appendChild(table);
+};
+
+const setActiveSidebarLink = () => {
+    const currentPage = document.body.dataset.page;
+    if (!currentPage) {
+        return;
+    }
+    document.querySelectorAll('.sidebar__link').forEach((link) => {
+        const isActive = link.dataset.page === currentPage;
+        link.classList.toggle('is-active', isActive);
+        if (isActive) {
+            link.setAttribute('aria-current', 'page');
+        } else {
+            link.removeAttribute('aria-current');
+        }
+    });
+};
+
+const setupSidebarToggle = () => {
+    const toggleButtons = document.querySelectorAll('[data-action="toggle-sidebar"]');
+    const closeButtons = document.querySelectorAll('[data-action="close-sidebar"]');
+    const links = document.querySelectorAll('.sidebar__link');
+    if (!toggleButtons.length) {
+        return;
+    }
+    const closeSidebar = () => document.body.classList.remove('sidebar-open');
+    toggleButtons.forEach((btn) => btn.addEventListener('click', () => {
+        document.body.classList.toggle('sidebar-open');
+    }));
+    closeButtons.forEach((btn) => btn.addEventListener('click', closeSidebar));
+    links.forEach((link) => link.addEventListener('click', closeSidebar));
 };
 
 const serializeForm = (form) => Object.fromEntries(new FormData(form).entries());
@@ -469,6 +518,7 @@ const initTransferModal = ({ onSaved } = {}) => {
     const fromSelect = byId('transfer-quick-from');
     const toSelect = byId('transfer-quick-to');
     const dateInput = byId('transfer-quick-date');
+    const amountInput = form.querySelector('input[name="amount"]');
 
     let accountsCache = null;
 
@@ -503,11 +553,25 @@ const initTransferModal = ({ onSaved } = {}) => {
         }
     };
 
+    modal.querySelectorAll('[data-amount-delta]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const delta = Number(btn.dataset.amountDelta || 0);
+            const current = Number(amountInput.value || 0);
+            const next = Math.max(0, current + delta);
+            amountInput.value = next ? next.toFixed(2) : '';
+        });
+    });
+
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const data = serializeForm(form);
         if (data.from_account_id === data.to_account_id) {
             showError('Выберите разные счета для перевода.');
+            return;
+        }
+        if (Number(data.amount || 0) <= 0) {
+            showError('Сумма должна быть больше нуля.');
+            amountInput.focus();
             return;
         }
         await requestWithToast(() => postJson('/api/transfers', data), 'Перевод выполнен');
@@ -925,6 +989,7 @@ const initAccounts = async () => {
     const form = byId('accounts-form');
     const title = byId('accounts-form-title');
     const cancel = byId('accounts-cancel');
+    const addButton = byId('accounts-add');
 
     const load = async () => {
         const { accounts } = await getJson('/api/accounts');
@@ -932,9 +997,7 @@ const initAccounts = async () => {
             table,
             ['Название', 'Тип', 'Валюта', 'Баланс', 'Статус', 'Действия'],
             accounts.map((acc) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         account_id: acc.account_id,
@@ -945,12 +1008,14 @@ const initAccounts = async () => {
                         is_active: acc.is_active,
                     });
                     title.textContent = `Редактирование: ${acc.name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Скрыть';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть счёт', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction(`Скрыть счёт «${acc.name}»?`)) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/accounts/${acc.account_id}`),
                         'Счёт скрыт'
@@ -960,13 +1025,11 @@ const initAccounts = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [
                     acc.name,
-                    acc.account_type,
+                    accountTypeLabels[acc.account_type] ?? acc.account_type,
                     acc.currency_code,
                     formatCurrency(acc.balance),
                     acc.is_active ? 'Активен' : 'Скрыт',
@@ -999,6 +1062,14 @@ const initAccounts = async () => {
         title.textContent = 'Новый счёт';
     });
 
+    if (addButton) {
+        addButton.addEventListener('click', () => {
+            form.reset();
+            title.textContent = 'Новый счёт';
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+
     await load();
 };
 
@@ -1017,9 +1088,7 @@ const initCategories = async () => {
             table,
             ['Название', 'Тип', 'Статус', 'Действия'],
             categories.map((cat) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         category_id: cat.category_id,
@@ -1028,12 +1097,14 @@ const initCategories = async () => {
                         is_active: cat.is_active,
                     });
                     title.textContent = `Редактирование: ${cat.name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Скрыть';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть категорию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction(`Скрыть категорию «${cat.name}»?`)) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/categories/${cat.category_id}`),
                         'Категория скрыта'
@@ -1043,8 +1114,6 @@ const initCategories = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [cat.name, cat.category_type === 'income' ? 'Доход' : 'Расход', cat.is_active ? 'Активна' : 'Скрыта', actions];
@@ -1112,17 +1181,16 @@ const initTransactions = async () => {
             table,
             ['Дата', 'Тип', 'Категория', 'Счёт', 'Сумма', 'Комментарий', 'Действия'],
             transactions.map((tx) => {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     transactionModal?.open({ transaction: tx });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить операцию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить операцию?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/transactions/${tx.transaction_id}`),
                         'Операция удалена'
@@ -1132,8 +1200,6 @@ const initTransactions = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [
@@ -1155,10 +1221,11 @@ const initTransactions = async () => {
             transfersTable,
             ['Дата', 'Откуда', 'Куда', 'Сумма', 'Комиссия', 'Комментарий', 'Действия'],
             transfers.map((tr) => {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить перевод', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить перевод?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/transfers/${tr.transfer_id}`),
                         'Перевод удалён'
@@ -1229,9 +1296,7 @@ const initBudgets = async () => {
                 bar.style.width = `${percent}%`;
                 progress.appendChild(bar);
 
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn btn-outline btn-sm';
-                editBtn.textContent = 'Редактировать';
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     setFormValues(form, {
                         budget_id: b.budget_id,
@@ -1240,12 +1305,14 @@ const initBudgets = async () => {
                         limit_amount: b.limit_amount,
                     });
                     title.textContent = `Редактирование: ${b.category_name}`;
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-outline btn-sm';
-                deleteBtn.textContent = 'Удалить';
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить бюджет?')) {
+                        return;
+                    }
                     await requestWithToast(
                         () => deleteJson(`/api/budgets/${b.budget_id}`),
                         'Бюджет удалён'
@@ -1255,8 +1322,6 @@ const initBudgets = async () => {
 
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.style.display = 'flex';
-                actions.style.gap = '8px';
                 actions.append(editBtn, deleteBtn);
 
                 return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), progress, actions];
@@ -1323,9 +1388,7 @@ const initGoals = async () => {
             const actions = document.createElement('div');
             actions.className = 'form-actions';
 
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn btn-outline btn-sm';
-            editBtn.textContent = 'Редактировать';
+            const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
             editBtn.addEventListener('click', () => {
                 setFormValues(form, {
                     goal_id: goal.goal_id,
@@ -1336,12 +1399,14 @@ const initGoals = async () => {
                     status: goal.status,
                 });
                 title.textContent = `Редактирование: ${goal.name}`;
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-outline btn-sm';
-            deleteBtn.textContent = 'Удалить';
+            const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить цель', variant: 'outline' });
             deleteBtn.addEventListener('click', async () => {
+                if (!confirmAction('Удалить цель?')) {
+                    return;
+                }
                 await requestWithToast(
                     () => deleteJson(`/api/goals/${goal.goal_id}`),
                     'Цель удалена'
@@ -1477,6 +1542,8 @@ const page = document.body.dataset.page;
 setupLogout();
 initAuthForms();
 initSelectEnhancements();
+setActiveSidebarLink();
+setupSidebarToggle();
 
 if (page === 'dashboard') {
     initDashboard().catch(console.error);
