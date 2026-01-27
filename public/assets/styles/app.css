@@ -397,6 +397,7 @@ a {
     align-items: center;
     justify-content: center;
     border-radius: 10px;
+    background-color: transparent !important;
 }
 
 .table__row .btn-outline {
