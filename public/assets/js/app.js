@@ -986,40 +986,106 @@ const initDashboard = async () => {
 
 const initAccounts = async () => {
     const table = byId('accounts-table');
+    const modal = byId('accounts-modal');
     const form = byId('accounts-form');
     const title = byId('accounts-form-title');
     const cancel = byId('accounts-cancel');
     const addButton = byId('accounts-add');
+    const deleteModal = byId('accounts-delete-modal');
+    const deleteForm = byId('accounts-delete-form');
+    const deleteName = byId('accounts-delete-name');
+    const deleteBalance = byId('accounts-delete-balance');
+    const deleteTransfer = byId('accounts-delete-transfer');
+    const deleteTarget = byId('accounts-delete-target');
+    const state = {
+        accounts: [],
+    };
+
+    const createActionButton = (label, variant = 'outline') => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `btn btn-${variant} btn-sm`;
+        btn.textContent = label;
+        return btn;
+    };
+
+    const resetForm = () => {
+        form.reset();
+        title.textContent = 'Новый счёт';
+    };
+
+    const openFormModal = (account = null) => {
+        if (account) {
+            setFormValues(form, {
+                account_id: account.account_id,
+                name: account.name,
+                account_type: account.account_type,
+                currency_code: account.currency_code,
+                initial_balance: account.initial_balance,
+                is_active: account.is_active,
+            });
+            title.textContent = `Редактирование: ${account.name}`;
+        } else {
+            resetForm();
+        }
+        openModal(modal);
+    };
+
+    const openDeleteModal = (account) => {
+        const balance = Number(account.balance) || 0;
+        const availableTargets = state.accounts.filter(
+            (item) => item.account_id !== account.account_id && item.is_active
+        );
+
+        if (balance > 0 && availableTargets.length === 0) {
+            showError('Нужно выбрать другой активный счёт для перевода остатка.');
+            return;
+        }
+
+        setFormValues(deleteForm, { account_id: account.account_id });
+        if (deleteName) {
+            deleteName.textContent = account.name;
+        }
+        if (deleteBalance) {
+            deleteBalance.textContent = formatCurrency(balance);
+        }
+        if (deleteTransfer) {
+            deleteTransfer.style.display = balance > 0 ? '' : 'none';
+        }
+        if (deleteTarget) {
+            const options = availableTargets.map((item) => ({
+                value: item.account_id,
+                label: item.name,
+            }));
+            fillSelect(deleteTarget, options, 'Выберите счёт');
+            selectFirstOption(deleteTarget);
+        }
+        openModal(deleteModal);
+    };
 
     const load = async () => {
         const { accounts } = await getJson('/api/accounts');
+        state.accounts = accounts;
         renderTable(
             table,
             ['Название', 'Тип', 'Валюта', 'Баланс', 'Статус', 'Действия'],
             accounts.map((acc) => {
-                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
+                const editBtn = createActionButton('Редактировать');
                 editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        account_id: acc.account_id,
-                        name: acc.name,
-                        account_type: acc.account_type,
-                        currency_code: acc.currency_code,
-                        initial_balance: acc.initial_balance,
-                        is_active: acc.is_active,
-                    });
-                    title.textContent = `Редактирование: ${acc.name}`;
-                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    openFormModal(acc);
                 });
 
-                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть счёт', variant: 'outline' });
+                const deleteBtn = createActionButton('Удалить', 'outline');
                 deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction(`Скрыть счёт «${acc.name}»?`)) {
+                    const balance = Number(acc.balance) || 0;
+                    if (balance > 0) {
+                        openDeleteModal(acc);
                         return;
                     }
-                    await requestWithToast(
-                        () => deleteJson(`/api/accounts/${acc.account_id}`),
-                        'Счёт скрыт'
-                    );
+                    if (!confirmAction(`Удалить счёт «${acc.name}»?`)) {
+                        return;
+                    }
+                    await requestWithToast(() => deleteJson(`/api/accounts/${acc.account_id}`), 'Счёт удалён');
                     await load();
                 });
 
@@ -1052,21 +1118,59 @@ const initAccounts = async () => {
         } else {
             await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан');
         }
-        form.reset();
-        title.textContent = 'Новый счёт';
+        resetForm();
+        closeModal(modal);
         await load();
     });
 
-    cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новый счёт';
-    });
+    if (cancel) {
+        cancel.addEventListener('click', () => {
+            resetForm();
+            closeModal(modal);
+        });
+    }
+
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = serializeForm(deleteForm);
+            const accountId = Number(data.account_id);
+            const account = state.accounts.find((item) => item.account_id === accountId);
+            if (!account) {
+                closeModal(deleteModal);
+                return;
+            }
+
+            const balance = Number(account.balance) || 0;
+            if (balance > 0) {
+                const targetId = Number(data.target_account_id);
+                if (!targetId) {
+                    showError('Выберите счёт для перевода остатка.');
+                    return;
+                }
+                await requestWithToast(
+                    () =>
+                        postJson('/api/transfers', {
+                            from_account_id: accountId,
+                            to_account_id: targetId,
+                            amount: balance,
+                            fee: 0,
+                            tx_date: formatDateTimeLocal(new Date()),
+                            note: `Перевод остатка со счёта «${account.name}»`,
+                        }),
+                    'Остаток переведён'
+                );
+            }
+
+            await requestWithToast(() => deleteJson(`/api/accounts/${accountId}`), 'Счёт удалён');
+            closeModal(deleteModal);
+            await load();
+        });
+    }
 
     if (addButton) {
         addButton.addEventListener('click', () => {
-            form.reset();
-            title.textContent = 'Новый счёт';
-            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            openFormModal();
         });
     }
 
