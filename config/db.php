@@ -1,10 +1,10 @@
 <?php
 
-defined('DB_HOST') || define('DB_HOST', 'localhost');
-defined('DB_NAME') || define('DB_NAME', 'nikolxz1_2');
-defined('DB_USER') || define('DB_USER', 'nikolxz1_2');
-defined('DB_PASS') || define('DB_PASS', 'Qwerty228;');
-defined('DB_CHARSET') || define('DB_CHARSET', 'utf8mb4');
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'nikolxz1_2');
+define('DB_USER', 'nikolxz1_2');
+define('DB_PASS', 'Qwerty228;');
+define('DB_CHARSET', 'utf8mb4');
 
 return [
     'host' => DB_HOST,
