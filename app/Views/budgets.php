@@ -31,7 +31,7 @@
                         <div class="grid grid-4">
                             <label class="field">
                                 <span>Категория расхода</span>
-                                <select name="category_id" id="budgets-category"></select>
+                                <select name="category_id" id="budgets-category" required></select>
                             </label>
                             <label class="field">
                                 <span>Месяц</span>

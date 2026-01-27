@@ -1420,6 +1420,7 @@ const initBudgets = async () => {
         form.reset();
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
         setFormValues(form, { period_month: month, budget_id: '' });
+        selectFirstOption(categorySelect);
         title.textContent = 'Новый бюджет';
     };
 
