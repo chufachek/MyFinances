@@ -15,8 +15,25 @@ use App\Services\Response;
 
 $router = new \Bramus\Router\Router();
 
+$requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
+$requestPath = parse_url($requestUri, PHP_URL_PATH);
+if ($requestPath === null || $requestPath === false) {
+    $requestPath = '/';
+}
+
 $scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '/';
-$basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+$scriptBasePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+$forwardedPrefix = isset($_SERVER['HTTP_X_FORWARDED_PREFIX']) ? trim((string) $_SERVER['HTTP_X_FORWARDED_PREFIX']) : '';
+$envBasePath = getenv('APP_BASE_PATH');
+$basePath = $forwardedPrefix !== '' ? $forwardedPrefix : ($envBasePath !== false && $envBasePath !== '' ? $envBasePath : $scriptBasePath);
+$basePath = '/' . ltrim(str_replace('\\', '/', $basePath), '/');
+$basePath = rtrim($basePath, '/');
+if ($basePath === '/') {
+    $basePath = '';
+}
+if ($basePath !== '' && strpos($requestPath, $basePath) !== 0) {
+    $basePath = '';
+}
 if ($basePath !== '') {
     $router->setBasePath($basePath);
 }
