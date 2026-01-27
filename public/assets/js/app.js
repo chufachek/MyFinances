@@ -1731,25 +1731,54 @@ const initBudgets = async () => {
         const percentRaw = budget.limit_amount > 0 ? (budget.spent / budget.limit_amount) * 100 : 0;
         const percent = Number.isFinite(percentRaw) ? Math.min(100, Math.max(0, percentRaw)) : 0;
         const isExceeded = percent >= 100;
+        const isWarning = !isExceeded && percent >= 85;
+        const remaining = budget.limit_amount - budget.spent;
 
         const badge = document.createElement('span');
         badge.className = 'badge budget-status__label';
         if (isExceeded) {
             badge.classList.add('budget-status__label--danger');
+        } else if (isWarning) {
+            badge.classList.add('budget-status__label--warning');
         }
-        badge.textContent = isExceeded ? 'Превышено' : `${percent.toFixed(0)}%`;
+        badge.textContent = isExceeded ? 'Превышено' : isWarning ? 'Почти лимит' : 'В пределах';
+
+        const header = document.createElement('div');
+        header.className = 'budget-status__header';
+
+        const percentText = document.createElement('span');
+        percentText.className = 'budget-status__value';
+        if (isExceeded) {
+            percentText.classList.add('budget-status__value--danger');
+        } else if (isWarning) {
+            percentText.classList.add('budget-status__value--warning');
+        }
+        percentText.textContent = `${percent.toFixed(0)}%`;
+        header.append(badge, percentText);
+
+        const meta = document.createElement('div');
+        meta.className = 'budget-status__meta';
+        if (budget.limit_amount <= 0) {
+            meta.textContent = 'Лимит не задан';
+        } else if (remaining >= 0) {
+            meta.textContent = `Осталось ${formatCurrency(remaining)}`;
+        } else {
+            meta.textContent = `Перерасход ${formatCurrency(Math.abs(remaining))}`;
+        }
 
         const progress = document.createElement('div');
-        progress.className = 'progress';
+        progress.className = 'progress progress--budget';
         const bar = document.createElement('div');
         bar.className = 'progress__bar';
         if (isExceeded) {
             bar.classList.add('progress__bar--danger');
+        } else if (isWarning) {
+            bar.classList.add('progress__bar--warning');
         }
         bar.style.width = `${percent}%`;
         progress.appendChild(bar);
 
-        status.append(badge, progress);
+        status.append(header, meta, progress);
         return status;
     };
 
