@@ -1008,10 +1008,16 @@ const initDashboard = async () => {
 
 const initAccounts = async () => {
     const table = byId('accounts-table');
+    const modal = byId('accounts-modal');
     const form = byId('accounts-form');
     const title = byId('accounts-form-title');
     const cancel = byId('accounts-cancel');
     const addButton = byId('accounts-add');
+
+    const resetForm = () => {
+        form.reset();
+        title.textContent = 'Новый счёт';
+    };
 
     const load = async () => {
         const { accounts } = await getJson('/api/accounts');
@@ -1069,25 +1075,28 @@ const initAccounts = async () => {
         if (id) {
             await requestWithToast(
                 () => putJson(`/api/accounts/${id}`, data),
-                'Счёт обновлён'
+                'Счёт обновлён',
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, 'Счёт обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан');
+            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт успешно создан', {
+                showSuccess: false,
+            });
+            closeModalWithToast(modal, 'Счёт успешно создан');
         }
-        form.reset();
-        title.textContent = 'Новый счёт';
+        resetForm();
         await load();
     });
 
     cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новый счёт';
+        resetForm();
+        closeModal(modal);
     });
 
     if (addButton) {
         addButton.addEventListener('click', () => {
-            form.reset();
-            title.textContent = 'Новый счёт';
+            resetForm();
             form.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
