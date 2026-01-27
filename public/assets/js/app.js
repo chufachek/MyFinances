@@ -219,7 +219,8 @@ const setSelectValue = (select, value) => {
 const fillSelect = (select, options, placeholder = 'Все') => {
     if (select?._choices) {
         const choices = [];
-        if (placeholder) {
+        const hasPlaceholder = options.some((opt) => opt.value === '' || opt.label === placeholder);
+        if (placeholder && !hasPlaceholder) {
             choices.push({
                 value: '',
                 label: placeholder,
@@ -238,7 +239,8 @@ const fillSelect = (select, options, placeholder = 'Все') => {
         return;
     }
     select.innerHTML = '';
-    if (placeholder) {
+    const hasPlaceholder = options.some((opt) => opt.value === '' || opt.label === placeholder);
+    if (placeholder && !hasPlaceholder) {
         const empty = document.createElement('option');
         empty.value = '';
         empty.textContent = placeholder;
@@ -1179,10 +1181,33 @@ const initAccounts = async () => {
 
 const initCategories = async () => {
     const table = byId('categories-table');
+    const modal = byId('categories-modal');
     const form = byId('categories-form');
     const title = byId('categories-form-title');
     const filter = byId('categories-filter');
     const cancel = byId('categories-cancel');
+    const addButton = byId('categories-add');
+
+    const resetForm = () => {
+        form.reset();
+        setFormValues(form, { category_id: '' });
+        title.textContent = 'Новая категория';
+    };
+
+    const openFormModal = (category = null) => {
+        if (category) {
+            setFormValues(form, {
+                category_id: category.category_id,
+                name: category.name,
+                category_type: category.category_type,
+                is_active: category.is_active,
+            });
+            title.textContent = `Редактирование: ${category.name}`;
+        } else {
+            resetForm();
+        }
+        openModal(modal);
+    };
 
     const load = async () => {
         const type = filter.value;
@@ -1194,24 +1219,17 @@ const initCategories = async () => {
             categories.map((cat) => {
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        category_id: cat.category_id,
-                        name: cat.name,
-                        category_type: cat.category_type,
-                        is_active: cat.is_active,
-                    });
-                    title.textContent = `Редактирование: ${cat.name}`;
-                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    openFormModal(cat);
                 });
 
-                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть категорию', variant: 'outline' });
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить категорию', variant: 'outline' });
                 deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction(`Скрыть категорию «${cat.name}»?`)) {
+                    if (!confirmAction(`Удалить категорию «${cat.name}»?`)) {
                         return;
                     }
                     await requestWithToast(
                         () => deleteJson(`/api/categories/${cat.category_id}`),
-                        'Категория скрыта'
+                        'Категория удалена'
                     );
                     await load();
                 });
@@ -1238,17 +1256,27 @@ const initCategories = async () => {
         } else {
             await requestWithToast(() => postJson('/api/categories', data), 'Категория создана');
         }
-        form.reset();
-        title.textContent = 'Новая категория';
+        resetForm();
+        closeModal(modal);
         await load();
     });
 
     cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новая категория';
+        resetForm();
+        closeModal(modal);
     });
 
     filter.addEventListener('change', load);
+
+    if (addButton) {
+        addButton.addEventListener('click', () => {
+            openFormModal();
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', resetForm);
+    }
 
     await load();
 };

@@ -84,6 +84,7 @@ class Auth
             return ':' . $key;
         }, array_keys($fields)));
         $userId = (int) DB::add(sprintf('INSERT INTO users (%s) VALUES (%s)', $columnsSql, $placeholders), $fields);
+        self::seedDefaultCategories($userId);
         $_SESSION['user_id'] = $userId;
         $_SESSION['user_name'] = $fullName ?: $email;
         return ['success' => true, 'user_id' => $userId];
@@ -140,5 +141,32 @@ class Auth
             }
         }
         return null;
+    }
+
+    private static function seedDefaultCategories(int $userId): void
+    {
+        $defaults = [
+            ['name' => 'Зарплата', 'type' => 'income'],
+            ['name' => 'Фриланс', 'type' => 'income'],
+            ['name' => 'Подарки', 'type' => 'income'],
+            ['name' => 'Продукты', 'type' => 'expense'],
+            ['name' => 'Транспорт', 'type' => 'expense'],
+            ['name' => 'Кафе', 'type' => 'expense'],
+            ['name' => 'Жильё', 'type' => 'expense'],
+            ['name' => 'Развлечения', 'type' => 'expense'],
+            ['name' => 'Здоровье', 'type' => 'expense'],
+            ['name' => 'Образование', 'type' => 'expense'],
+        ];
+
+        foreach ($defaults as $category) {
+            DB::add(
+                'INSERT INTO categories (user_id, name, category_type, is_active) VALUES (:user_id, :name, :type, 1)',
+                [
+                    'user_id' => $userId,
+                    'name' => $category['name'],
+                    'type' => $category['type'],
+                ]
+            );
+        }
     }
 }

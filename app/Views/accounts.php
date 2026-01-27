@@ -46,11 +46,16 @@
                         </label>
                         <label class="field">
                             <span>Валюта</span>
-                            <input type="text" name="currency_code" value="RUB" maxlength="3">
+                            <select name="currency_code">
+                                <option value="RUB">Российский рубль (RUB)</option>
+                                <option value="USD">Доллар США (USD)</option>
+                                <option value="EUR">Евро (EUR)</option>
+                                <option value="GBP">Фунт стерлингов (GBP)</option>
+                            </select>
                         </label>
                         <label class="field">
                             <span>Начальный баланс</span>
-                            <input type="number" step="0.01" name="initial_balance" value="0">
+                            <input type="number" step="1" name="initial_balance" value="0">
                         </label>
                         <label class="field">
                             <span>Активен</span>
