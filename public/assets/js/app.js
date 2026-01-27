@@ -946,6 +946,7 @@ const initDashboard = async () => {
     const categoryCtx = byId('dashboard-category');
     const monthlyCtx = byId('dashboard-monthly');
     const categoryList = byId('dashboard-category-list');
+    const budgetList = byId('dashboard-budget-list');
     let lineChart;
     let categoryChart;
     let monthlyChart;
@@ -963,7 +964,7 @@ const initDashboard = async () => {
         const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult] =
+        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult, budgetsResult] =
             await Promise.allSettled([
                 getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
                 getJson('/api/transactions?limit=5'),
@@ -976,6 +977,7 @@ const initDashboard = async () => {
                           )}&groupBy=month&type=expense`
                       )
                     : Promise.resolve({ labels: [], expense: [] }),
+                budgetList ? getJson(`/api/budgets?month=${month}`) : Promise.resolve({ budgets: [] }),
             ]);
 
         if (
@@ -983,7 +985,8 @@ const initDashboard = async () => {
             txResult.status === 'rejected' ||
             categoryResult.status === 'rejected' ||
             dailyResult.status === 'rejected' ||
-            monthlyResult.status === 'rejected'
+            monthlyResult.status === 'rejected' ||
+            budgetsResult.status === 'rejected'
         ) {
             showError('Не удалось загрузить все данные дашборда.');
         }
@@ -1008,6 +1011,10 @@ const initDashboard = async () => {
             monthlyResult.status === 'fulfilled'
                 ? monthlyResult.value
                 : { labels: [], expense: [] };
+        const budgets =
+            budgetsResult.status === 'fulfilled'
+                ? budgetsResult.value
+                : { budgets: [] };
 
         setText('summary-balance', formatCurrency(summary.balance));
         setText('summary-income', formatCurrency(summary.income));
@@ -1055,6 +1062,82 @@ const initDashboard = async () => {
                     )}</span>`;
                     categoryList.appendChild(row);
                 });
+            }
+        }
+
+        if (budgetList) {
+            budgetList.innerHTML = '';
+            const list = budgets.budgets || [];
+            if (list.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-muted';
+                empty.textContent = getRandomEmptyMessage();
+                budgetList.appendChild(empty);
+            } else {
+                list
+                    .map((item) => {
+                        const limit = Number(item.limit_amount) || 0;
+                        const spent = Number(item.spent) || 0;
+                        const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                        return {
+                            ...item,
+                            limit,
+                            spent,
+                            percent,
+                        };
+                    })
+                    .sort((a, b) => b.percent - a.percent)
+                    .slice(0, 3)
+                    .forEach((item) => {
+                        const row = document.createElement('div');
+                        row.className = 'budget-status';
+
+                        const header = document.createElement('div');
+                        header.className = 'budget-status__header';
+
+                        const title = document.createElement('span');
+                        title.textContent = item.category_name;
+
+                        const badge = document.createElement('span');
+                        const variant = item.status_variant || 'success';
+                        badge.className = 'badge';
+                        if (variant === 'danger') {
+                            badge.classList.add('budget-status__label--danger');
+                        } else if (variant === 'warning') {
+                            badge.classList.add('budget-status__label--warning');
+                        }
+                        badge.textContent = item.status_label || 'В пределах';
+
+                        header.append(title, badge);
+
+                        const value = document.createElement('span');
+                        value.className = 'budget-status__value';
+                        if (variant === 'danger') {
+                            value.classList.add('budget-status__value--danger');
+                        } else if (variant === 'warning') {
+                            value.classList.add('budget-status__value--warning');
+                        }
+                        value.textContent = `${formatCurrency(item.spent)} из ${formatCurrency(item.limit)}`;
+
+                        const progress = document.createElement('div');
+                        progress.className = 'progress progress--budget';
+                        const bar = document.createElement('div');
+                        bar.className = 'progress__bar';
+                        if (variant === 'danger') {
+                            bar.classList.add('progress__bar--danger');
+                        } else if (variant === 'warning') {
+                            bar.classList.add('progress__bar--warning');
+                        }
+                        bar.style.width = `${Math.min(item.percent, 100)}%`;
+                        progress.appendChild(bar);
+
+                        const meta = document.createElement('span');
+                        meta.className = 'budget-status__meta';
+                        meta.textContent = `Использовано: ${item.percent}%`;
+
+                        row.append(header, value, progress, meta);
+                        budgetList.appendChild(row);
+                    });
             }
         }
 
@@ -1736,43 +1819,48 @@ const initBudgets = async () => {
     };
 
     const load = async () => {
-        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
-        monthPicker.value = month;
-        const { budgets } = await getJson(`/api/budgets?month=${month}`);
-        renderTable(
-            table,
-            ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
-            budgets.map((b) => {
-                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-                editBtn.addEventListener('click', () => {
-                    openFormModal(b);
-                });
-
-                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
-                deleteBtn.addEventListener('click', async () => {
-                    const confirmed = await confirmAction('Удалить бюджет?', {
-                        titleText: 'Удаление бюджета',
-                        confirmText: 'Удалить',
+        try {
+            const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+            monthPicker.value = month;
+            const { budgets } = await getJson(`/api/budgets?month=${month}`);
+            renderTable(
+                table,
+                ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
+                budgets.map((b) => {
+                    const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
+                    editBtn.addEventListener('click', () => {
+                        openFormModal(b);
                     });
-                    if (!confirmed) {
-                        return;
-                    }
-                    await requestWithToast(
-                        () => deleteJson(`/api/budgets/${b.budget_id}`),
-                        'Бюджет удалён'
-                    );
-                    await load();
-                });
 
-                const actions = document.createElement('div');
-                actions.className = 'table__actions';
-                actions.append(editBtn, deleteBtn);
+                    const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
+                    deleteBtn.addEventListener('click', async () => {
+                        const confirmed = await confirmAction('Удалить бюджет?', {
+                            titleText: 'Удаление бюджета',
+                            confirmText: 'Удалить',
+                        });
+                        if (!confirmed) {
+                            return;
+                        }
+                        await requestWithToast(
+                            () => deleteJson(`/api/budgets/${b.budget_id}`),
+                            'Бюджет удалён'
+                        );
+                        await load();
+                    });
 
-                const statusCell = buildStatusCell(b);
+                    const actions = document.createElement('div');
+                    actions.className = 'table__actions';
+                    actions.append(editBtn, deleteBtn);
 
-                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), statusCell, actions];
-            })
-        );
+                    const statusCell = buildStatusCell(b);
+
+                    return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), statusCell, actions];
+                })
+            );
+        } catch (error) {
+            showError('Не удалось загрузить бюджеты.');
+            renderTable(table, ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
+        }
     };
 
     monthPicker.addEventListener('change', load);

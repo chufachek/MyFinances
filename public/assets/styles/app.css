@@ -618,6 +618,25 @@ a {
     color: var(--green-500);
 }
 
+.stat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--gray-700);
+}
+
+.stat-item__value {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
 .budget-status {
     display: flex;
     flex-direction: column;
