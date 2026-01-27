@@ -1321,8 +1321,10 @@ const initAccounts = async () => {
             );
             closeModalWithToast(modal, 'Счёт обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан', { showSuccess: false });
-            closeModalWithToast(modal, 'Счёт создан');
+            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт успешно создан', {
+                showSuccess: false,
+            });
+            closeModalWithToast(modal, 'Счёт успешно создан');
         }
         resetForm();
         await load();
