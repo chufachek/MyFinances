@@ -135,6 +135,7 @@ $router->post('/api/auth/logout', [new AuthController(), 'logout']);
 $router->get('/api/auth/me', [new AuthController(), 'me']);
 
 $router->get('/api/accounts', [new AccountsController(), 'index']);
+$router->get('/api/accounts/{id}', [new AccountsController(), 'show']);
 $router->post('/api/accounts', [new AccountsController(), 'store']);
 $router->put('/api/accounts/{id}', [new AccountsController(), 'update']);
 $router->delete('/api/accounts/{id}', [new AccountsController(), 'delete']);

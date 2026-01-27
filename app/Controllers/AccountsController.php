@@ -29,6 +29,27 @@ class AccountsController
         Response::json(['accounts' => $stmt->fetchAll()]);
     }
 
+    public function show($id)
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
+            'SELECT account_id, name, account_type, currency_code, initial_balance, is_active
+             FROM accounts
+             WHERE account_id = :id AND user_id = :user_id'
+        );
+        $stmt->execute([
+            'id' => $id,
+            'user_id' => Auth::userId(),
+        ]);
+        $account = $stmt->fetch();
+        if (!$account) {
+            Response::json(['error' => 'Счёт не найден'], 404);
+            return;
+        }
+
+        Response::json(['account' => $account]);
+    }
+
     public function store()
     {
         $data = Request::data();
