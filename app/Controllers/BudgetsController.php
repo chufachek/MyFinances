@@ -20,6 +20,11 @@ class BudgetsController
         return $exception->getCode() === '23000';
     }
 
+    private function isUnknownColumnError(PDOException $exception): bool
+    {
+        return $exception->getCode() === '42S22';
+    }
+
     private function ensureBudgetsTable($pdo): void
     {
         $pdo->exec(
@@ -35,6 +40,33 @@ class BudgetsController
                 KEY idx_budgets_user_period (user_id, period_month)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    private function ensureBudgetsSchema($pdo): void
+    {
+        $this->ensureBudgetsTable($pdo);
+
+        $columns = $pdo->query('SHOW COLUMNS FROM budgets')->fetchAll();
+        $columnNames = array_map(static function ($column) {
+            return $column['Field'];
+        }, $columns);
+
+        if (!in_array('period_month', $columnNames, true) && in_array('month', $columnNames, true)) {
+            $pdo->exec('ALTER TABLE budgets CHANGE month period_month VARCHAR(7) NOT NULL');
+        }
+
+        $indexes = $pdo->query('SHOW INDEX FROM budgets')->fetchAll();
+        $indexNames = array_values(array_unique(array_map(static function ($index) {
+            return $index['Key_name'];
+        }, $indexes)));
+
+        if (!in_array('uniq_budgets_user_period', $indexNames, true)) {
+            $pdo->exec('ALTER TABLE budgets ADD UNIQUE KEY uniq_budgets_user_period (user_id, category_id, period_month)');
+        }
+
+        if (!in_array('idx_budgets_user_period', $indexNames, true)) {
+            $pdo->exec('ALTER TABLE budgets ADD KEY idx_budgets_user_period (user_id, period_month)');
+        }
     }
 
     private function spentExpression(string $placeholder): string
@@ -77,8 +109,8 @@ class BudgetsController
             ]);
             Response::json(['budgets' => $stmt->fetchAll()]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception)) {
-                $this->ensureBudgetsTable($pdo);
+            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
+                $this->ensureBudgetsSchema($pdo);
                 $spentExpression = $this->spentExpression(':tx_month_1');
                 $spentExpressionStatus = $this->spentExpression(':tx_month_2');
                 $spentExpressionVariant = $this->spentExpression(':tx_month_3');
@@ -137,8 +169,8 @@ class BudgetsController
             ]);
             Response::json(['success' => true]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception)) {
-                $this->ensureBudgetsTable($pdo);
+            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
+                $this->ensureBudgetsSchema($pdo);
                 $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
                 $stmt->execute([
                     'user_id' => Auth::userId(),
@@ -176,8 +208,8 @@ class BudgetsController
             ]);
             Response::json(['success' => true]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception)) {
-                $this->ensureBudgetsTable($pdo);
+            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
+                $this->ensureBudgetsSchema($pdo);
                 $stmt = $pdo->prepare('UPDATE budgets SET category_id = :category_id, period_month = :month, limit_amount = :amount WHERE budget_id = :id AND user_id = :user_id');
                 $stmt->execute([
                     'category_id' => $categoryId,
