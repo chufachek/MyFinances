@@ -43,12 +43,12 @@ class BudgetsController
         $pdo = Database::connection();
         try {
             $stmt = $pdo->prepare(
-                'SELECT b.*, c.name AS category_name,
-                    IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = "expense" AND DATE_FORMAT(t.tx_date, "%Y-%m") = :month), 0) AS spent
+                "SELECT b.*, c.name AS category_name,
+                    IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :month), 0) AS spent
                  FROM budgets b
                  JOIN categories c ON c.category_id = b.category_id
                  WHERE b.user_id = :user_id AND b.period_month = :month
-                 ORDER BY c.name'
+                 ORDER BY c.name"
             );
             $stmt->execute([
                 'user_id' => Auth::userId(),
@@ -59,12 +59,12 @@ class BudgetsController
             if ($this->isMissingTableError($exception)) {
                 $this->ensureBudgetsTable($pdo);
                 $stmt = $pdo->prepare(
-                    'SELECT b.*, c.name AS category_name,
-                        IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = "expense" AND DATE_FORMAT(t.tx_date, "%Y-%m") = :month), 0) AS spent
+                    "SELECT b.*, c.name AS category_name,
+                        IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :month), 0) AS spent
                      FROM budgets b
                      JOIN categories c ON c.category_id = b.category_id
                      WHERE b.user_id = :user_id AND b.period_month = :month
-                     ORDER BY c.name'
+                     ORDER BY c.name"
                 );
                 $stmt->execute([
                     'user_id' => Auth::userId(),

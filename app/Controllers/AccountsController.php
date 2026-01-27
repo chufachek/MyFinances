@@ -14,16 +14,16 @@ class AccountsController
         $pdo = Database::connection();
         $userId = Auth::userId();
         $stmt = $pdo->prepare(
-            'SELECT a.*, 
+            "SELECT a.*, 
                 a.initial_balance
-                + IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.account_id = a.account_id AND t.user_id = a.user_id AND t.tx_type = "income"), 0)
-                - IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.account_id = a.account_id AND t.user_id = a.user_id AND t.tx_type = "expense"), 0)
+                + IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.account_id = a.account_id AND t.user_id = a.user_id AND t.tx_type = 'income'), 0)
+                - IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.account_id = a.account_id AND t.user_id = a.user_id AND t.tx_type = 'expense'), 0)
                 + IFNULL((SELECT SUM(tr.amount) FROM transfers tr WHERE tr.to_account_id = a.account_id AND tr.user_id = a.user_id), 0)
                 - IFNULL((SELECT SUM(tr.amount + tr.fee) FROM transfers tr WHERE tr.from_account_id = a.account_id AND tr.user_id = a.user_id), 0)
                 AS balance
              FROM accounts a
              WHERE a.user_id = :user_id
-             ORDER BY a.created_at DESC'
+             ORDER BY a.created_at DESC"
         );
         $stmt->execute(['user_id' => $userId]);
         Response::json(['accounts' => $stmt->fetchAll()]);
