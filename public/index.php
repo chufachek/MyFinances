@@ -21,13 +21,19 @@ if ($basePath !== '') {
     $router->setBasePath($basePath);
 }
 
-$render = static function ($view, array $data = array()) {
+$withBasePath = static function (string $path) use ($basePath): string {
+    return $basePath . $path;
+};
+
+$render = static function ($view, array $data = array()) use ($basePath) {
     $viewFile = __DIR__ . '/../app/Views/' . $view . '.php';
     if (!file_exists($viewFile)) {
         http_response_code(404);
         echo 'View not found';
         return;
     }
+
+    $data['basePath'] = $basePath;
 
     extract($data, EXTR_SKIP);
 
@@ -38,11 +44,17 @@ $render = static function ($view, array $data = array()) {
     require __DIR__ . '/../app/Views/layout.php';
 };
 
-$router->before('GET|POST|PUT|DELETE', '/api/.*', static function () {
+$router->before('GET|POST|PUT|DELETE', '/api/.*', static function () use ($basePath) {
     $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
     $path = parse_url($requestUri, PHP_URL_PATH);
     if ($path === null || $path === false) {
         $path = '';
+    }
+    if ($basePath !== '' && strpos($path, $basePath) === 0) {
+        $path = substr($path, strlen($basePath));
+        if ($path === '') {
+            $path = '/';
+        }
     }
     if (in_array($path, ['/api/auth/login', '/api/auth/register'], true)) {
         return;
@@ -53,15 +65,15 @@ $router->before('GET|POST|PUT|DELETE', '/api/.*', static function () {
     }
 });
 
-$authRequired = static function () {
+$authRequired = static function () use ($withBasePath) {
     if (!Auth::check()) {
-        header('Location: /login');
+        header('Location: ' . $withBasePath('/login'));
         exit;
     }
 };
 
-$router->get('/', static function () use ($render) {
-    header('Location: /dashboard');
+$router->get('/', static function () use ($withBasePath) {
+    header('Location: ' . $withBasePath('/dashboard'));
 });
 
 $router->get('/login', static function () use ($render) {

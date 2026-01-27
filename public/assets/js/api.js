@@ -1,5 +1,20 @@
+const basePath = document?.body?.dataset?.basePath ?? '';
+
+const withBasePath = (url) => {
+    if (!url.startsWith('/')) {
+        return url;
+    }
+    if (!basePath) {
+        return url;
+    }
+    if (url.startsWith(`${basePath}/`)) {
+        return url;
+    }
+    return `${basePath}${url}`;
+};
+
 export async function apiRequest(url, options = {}) {
-    const response = await fetch(url, {
+    const response = await fetch(withBasePath(url), {
         headers: {
             'Content-Type': 'application/json',
             ...(options.headers ?? {}),

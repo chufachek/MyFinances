@@ -1,5 +1,19 @@
 import { getJson, postJson, putJson, deleteJson } from './api.js';
 
+const basePath = document?.body?.dataset?.basePath ?? '';
+const withBasePath = (path) => {
+    if (!path.startsWith('/')) {
+        return path;
+    }
+    if (!basePath) {
+        return path;
+    }
+    if (path.startsWith(`${basePath}/`)) {
+        return path;
+    }
+    return `${basePath}${path}`;
+};
+
 const formatCurrency = (value) => {
     const amount = Number(value ?? 0);
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount);
@@ -376,7 +390,7 @@ const setupLogout = () => {
     document.querySelectorAll('[data-action="logout"]').forEach((btn) => {
         btn.addEventListener('click', async () => {
             await postJson('/api/auth/logout', {});
-            window.location.href = '/login';
+            window.location.href = withBasePath('/login');
         });
     });
 };
@@ -718,7 +732,7 @@ const initAuthForms = () => {
             const data = serializeForm(loginForm);
             try {
                 await postJson('/api/auth/login', data);
-                window.location.href = '/dashboard';
+                window.location.href = withBasePath('/dashboard');
             } catch (error) {
                 showError('Не удалось войти. Проверьте данные.');
             }
@@ -736,7 +750,7 @@ const initAuthForms = () => {
             }
             try {
                 await postJson('/api/auth/register', data);
-                window.location.href = '/dashboard';
+                window.location.href = withBasePath('/dashboard');
             } catch (error) {
                 showError('Не удалось зарегистрироваться');
             }

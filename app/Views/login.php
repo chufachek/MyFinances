@@ -13,6 +13,6 @@
             </label>
             <button class="btn btn-primary" type="submit">Войти</button>
         </form>
-        <p class="text-muted">Нет аккаунта? <a class="link" href="/register">Зарегистрироваться</a></p>
+        <p class="text-muted">Нет аккаунта? <a class="link" href="<?= htmlspecialchars(($basePath ?? '') . '/register', ENT_QUOTES) ?>">Зарегистрироваться</a></p>
     </div>
 </section>
