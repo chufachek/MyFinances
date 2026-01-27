@@ -1385,11 +1385,17 @@ const initAccounts = async () => {
 const initCategories = async () => {
     const table = byId('categories-table');
     const modal = byId('categories-modal');
+    const deleteModal = byId('categories-delete-modal');
+    const deleteName = byId('categories-delete-name');
+    const deleteConfirm = byId('categories-delete-confirm');
+    const deleteCancel = byId('categories-delete-cancel');
+    const deleteClose = byId('categories-delete-close');
     const form = byId('categories-form');
     const title = byId('categories-form-title');
     const filter = byId('categories-filter');
     const cancel = byId('categories-cancel');
     const addButton = byId('categories-add');
+    let deleteResolver = null;
 
     const resetForm = () => {
         form.reset();
@@ -1410,6 +1416,35 @@ const initCategories = async () => {
             resetForm();
         }
         openModal(modal);
+    };
+
+    const resolveDelete = (confirmed) => {
+        if (!deleteResolver) {
+            return;
+        }
+        deleteResolver(confirmed);
+        deleteResolver = null;
+    };
+
+    const closeDeleteModal = (confirmed) => {
+        resolveDelete(confirmed);
+        closeModal(deleteModal);
+    };
+
+    const requestDeleteConfirmation = (category) => {
+        if (!deleteModal || !deleteConfirm) {
+            return confirmAction(`Удалить категорию «${category.name}»?`, {
+                titleText: 'Удаление категории',
+                confirmText: 'Удалить',
+            });
+        }
+        if (deleteName) {
+            deleteName.textContent = category.name;
+        }
+        openModal(deleteModal);
+        return new Promise((resolve) => {
+            deleteResolver = resolve;
+        });
     };
 
     const load = async () => {
@@ -1434,10 +1469,7 @@ const initCategories = async () => {
 
                     const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить категорию', variant: 'outline' });
                     deleteBtn.addEventListener('click', async () => {
-                        const confirmed = await confirmAction(`Удалить категорию «${cat.name}»?`, {
-                            titleText: 'Удаление категории',
-                            confirmText: 'Удалить',
-                        });
+                        const confirmed = await requestDeleteConfirmation(cat);
                         if (!confirmed) {
                             return;
                         }
@@ -1479,6 +1511,22 @@ const initCategories = async () => {
         resetForm();
         closeModal(modal);
     });
+
+    if (deleteConfirm) {
+        deleteConfirm.addEventListener('click', () => closeDeleteModal(true));
+    }
+
+    if (deleteCancel) {
+        deleteCancel.addEventListener('click', () => closeDeleteModal(false));
+    }
+
+    if (deleteClose) {
+        deleteClose.addEventListener('click', () => closeDeleteModal(false));
+    }
+
+    if (deleteModal) {
+        deleteModal.addEventListener('hidden.bs.modal', () => resolveDelete(false));
+    }
 
     filter.addEventListener('change', load);
 
