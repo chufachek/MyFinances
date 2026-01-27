@@ -68,3 +68,27 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="categories-delete-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="text-muted mb-1">Подтверждение</p>
+                    <h3 class="modal-title fs-5">Удалить категорию?</h3>
+                </div>
+                <button class="btn-close" type="button" id="categories-delete-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы собираетесь удалить категорию «<span id="categories-delete-name"></span>».</p>
+                <p class="text-muted mb-0">Действие нельзя отменить.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" type="button" id="categories-delete-confirm">Удалить</button>
+                <button class="btn btn-outline" type="button" id="categories-delete-cancel" data-bs-dismiss="modal" data-action="close-modal">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
