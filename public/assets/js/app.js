@@ -142,11 +142,42 @@ const closeModalWithToast = (modal, message, variant = 'success') => {
     showToast(message, variant);
 };
 
-const confirmAction = (message, options = {}) => {
-    const modal = byId('confirm-modal');
-    if (!modal) {
-        return Promise.resolve(window.confirm(message));
+const ensureConfirmModal = () => {
+    let modal = byId('confirm-modal');
+    if (modal) {
+        return modal;
     }
+    modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'confirm-modal';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="text-muted mb-1">Подтверждение</p>
+                        <h3 class="modal-title fs-5" id="confirm-modal-title">Подтверждение</h3>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-modal-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="button" id="confirm-modal-confirm">Подтвердить</button>
+                    <button class="btn btn-outline" type="button" data-bs-dismiss="modal" data-action="close-modal" id="confirm-modal-cancel">Отмена</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+};
+
+const confirmAction = (message, options = {}) => {
+    const modal = ensureConfirmModal();
 
     const title = byId('confirm-modal-title');
     const text = byId('confirm-modal-message');
@@ -433,7 +464,12 @@ const getBootstrapModal = (modal) => {
         return null;
     }
     if (window.bootstrap?.Modal) {
-        return window.bootstrap.Modal.getOrCreateInstance(modal);
+        try {
+            return window.bootstrap.Modal.getOrCreateInstance(modal);
+        } catch (error) {
+            console.warn('Не удалось инициализировать Bootstrap-модалку.', error);
+            return null;
+        }
     }
     return null;
 };
@@ -444,8 +480,12 @@ const openModal = (modal) => {
     }
     const instance = getBootstrapModal(modal);
     if (instance) {
-        instance.show();
-        return;
+        try {
+            instance.show();
+            return;
+        } catch (error) {
+            console.warn('Не удалось открыть Bootstrap-модалку.', error);
+        }
     }
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -457,8 +497,12 @@ const closeModal = (modal) => {
     }
     const instance = getBootstrapModal(modal);
     if (instance) {
-        instance.hide();
-        return;
+        try {
+            instance.hide();
+            return;
+        } catch (error) {
+            console.warn('Не удалось закрыть Bootstrap-модалку.', error);
+        }
     }
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
