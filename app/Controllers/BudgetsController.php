@@ -42,9 +42,20 @@ class BudgetsController
         $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
         $pdo = Database::connection();
         try {
+            $spentExpression = "IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :tx_month), 0)";
             $stmt = $pdo->prepare(
                 "SELECT b.*, c.name AS category_name,
-                    IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :tx_month), 0) AS spent
+                    {$spentExpression} AS spent,
+                    CASE
+                        WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
+                        WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
+                        ELSE 'В пределах'
+                    END AS status_label,
+                    CASE
+                        WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 100 THEN 'danger'
+                        WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 85 THEN 'warning'
+                        ELSE 'success'
+                    END AS status_variant
                  FROM budgets b
                  JOIN categories c ON c.category_id = b.category_id
                  WHERE b.user_id = :user_id AND b.period_month = :period_month
@@ -59,9 +70,20 @@ class BudgetsController
         } catch (PDOException $exception) {
             if ($this->isMissingTableError($exception)) {
                 $this->ensureBudgetsTable($pdo);
+                $spentExpression = "IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :tx_month), 0)";
                 $stmt = $pdo->prepare(
                     "SELECT b.*, c.name AS category_name,
-                        IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :tx_month), 0) AS spent
+                        {$spentExpression} AS spent,
+                        CASE
+                            WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
+                            WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
+                            ELSE 'В пределах'
+                        END AS status_label,
+                        CASE
+                            WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 100 THEN 'danger'
+                            WHEN b.limit_amount > 0 AND ({$spentExpression} / b.limit_amount) * 100 >= 85 THEN 'warning'
+                            ELSE 'success'
+                        END AS status_variant
                      FROM budgets b
                      JOIN categories c ON c.category_id = b.category_id
                      WHERE b.user_id = :user_id AND b.period_month = :period_month
