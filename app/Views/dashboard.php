@@ -82,7 +82,7 @@
                                 <span>Категория</span>
                                 <select name="category_id"></select>
                             </label>
-                            <label class="field">
+                            <div class="field">
                                 <span>Сумма</span>
                                 <div class="amount-control">
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
@@ -93,7 +93,7 @@
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
                                 </div>
-                            </label>
+                            </div>
                             <label class="field">
                                 <span>Дата</span>
                                 <input type="date" name="tx_date" required>
@@ -141,7 +141,7 @@
                                 <span>Категория</span>
                                 <select name="category_id"></select>
                             </label>
-                            <label class="field">
+                            <div class="field">
                                 <span>Сумма</span>
                                 <div class="amount-control">
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="-1000">-1000</button>
@@ -152,7 +152,7 @@
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="500">+500</button>
                                     <button class="btn btn-outline btn-sm" type="button" data-amount-delta="1000">+1000</button>
                                 </div>
-                            </label>
+                            </div>
                             <label class="field">
                                 <span>Дата</span>
                                 <input type="date" name="tx_date" required>
