@@ -1721,9 +1721,36 @@ const initBudgets = async () => {
             return;
         }
         resetForm();
-        requestAnimationFrame(() => {
-            openModal(modal);
-        });
+        openModal(modal);
+    };
+
+    const buildStatusCell = (budget) => {
+        const status = document.createElement('div');
+        status.className = 'budget-status';
+
+        const percentRaw = budget.limit_amount > 0 ? (budget.spent / budget.limit_amount) * 100 : 0;
+        const percent = Number.isFinite(percentRaw) ? Math.min(100, Math.max(0, percentRaw)) : 0;
+        const isExceeded = percent >= 100;
+
+        const badge = document.createElement('span');
+        badge.className = 'badge budget-status__label';
+        if (isExceeded) {
+            badge.classList.add('budget-status__label--danger');
+        }
+        badge.textContent = isExceeded ? 'Превышено' : `${percent.toFixed(0)}%`;
+
+        const progress = document.createElement('div');
+        progress.className = 'progress';
+        const bar = document.createElement('div');
+        bar.className = 'progress__bar';
+        if (isExceeded) {
+            bar.classList.add('progress__bar--danger');
+        }
+        bar.style.width = `${percent}%`;
+        progress.appendChild(bar);
+
+        status.append(badge, progress);
+        return status;
     };
 
     const load = async () => {
@@ -1734,9 +1761,6 @@ const initBudgets = async () => {
             table,
             ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
             budgets.map((b) => {
-                const percent = b.limit_amount > 0 ? Math.min(100, (b.spent / b.limit_amount) * 100) : 0;
-                const status = percent >= 100 ? 'Превышено' : `${percent.toFixed(0)}%`;
-
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     openFormModal(b);
@@ -1762,7 +1786,9 @@ const initBudgets = async () => {
                 actions.className = 'table__actions';
                 actions.append(editBtn, deleteBtn);
 
-                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), status, actions];
+                const statusCell = buildStatusCell(b);
+
+                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), statusCell, actions];
             })
         );
     };

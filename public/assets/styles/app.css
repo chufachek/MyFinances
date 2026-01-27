@@ -618,6 +618,21 @@ a {
     color: var(--green-500);
 }
 
+.budget-status {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.budget-status__label--danger {
+    background: #fdecea;
+    color: #b42318;
+}
+
+.progress__bar--danger {
+    background: #f97066;
+}
+
 .progress {
     width: 100%;
     height: 8px;
