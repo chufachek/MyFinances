@@ -279,6 +279,8 @@ a {
     background: transparent;
     padding: 0;
     box-shadow: none;
+    flex-wrap: wrap;
+    max-width: 100%;
 }
 
 .icon-btn {
@@ -411,6 +413,8 @@ a {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+    max-width: 100%;
 }
 
 .form-actions .btn-outline {
