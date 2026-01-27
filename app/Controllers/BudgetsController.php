@@ -49,121 +49,162 @@ class BudgetsController
         $columns = $pdo->query('SHOW COLUMNS FROM budgets')->fetchAll();
         $columnNames = array_map(static function ($column) {
             return $column['Field'];
-        }, $columns);
 
-        if (!in_array('period_month', $columnNames, true) && in_array('month', $columnNames, true)) {
-            $pdo->exec('ALTER TABLE budgets CHANGE month period_month VARCHAR(7) NOT NULL');
-        }
-
-        $indexes = $pdo->query('SHOW INDEX FROM budgets')->fetchAll();
-        $indexNames = array_values(array_unique(array_map(static function ($index) {
-            return $index['Key_name'];
-        }, $indexes)));
-
-        if (!in_array('uniq_budgets_user_period', $indexNames, true)) {
-            $pdo->exec('ALTER TABLE budgets ADD UNIQUE KEY uniq_budgets_user_period (user_id, category_id, period_month)');
-        }
-
-        if (!in_array('idx_budgets_user_period', $indexNames, true)) {
-            $pdo->exec('ALTER TABLE budgets ADD KEY idx_budgets_user_period (user_id, period_month)');
-        }
-    }
-
-    private function spentExpression(string $placeholder): string
-    {
-        return "IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = {$placeholder}), 0)";
-    }
-
-    public function index()
-    {
-        $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
-        $pdo = Database::connection();
-        try {
-            $spentExpression = $this->spentExpression(':tx_month_1');
-            $spentExpressionStatus = $this->spentExpression(':tx_month_2');
-            $spentExpressionVariant = $this->spentExpression(':tx_month_3');
-            $stmt = $pdo->prepare(
-                "SELECT b.*, c.name AS category_name,
-                    {$spentExpression} AS spent,
-                    CASE
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
-                        ELSE 'В пределах'
-                    END AS status_label,
-                    CASE
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
-                        ELSE 'success'
-                    END AS status_variant
-                 FROM budgets b
-                 JOIN categories c ON c.category_id = b.category_id
-                 WHERE b.user_id = :user_id AND b.period_month = :period_month
-                 ORDER BY c.name"
-            );
-            $stmt->execute([
-                'user_id' => Auth::userId(),
-                'tx_month_1' => $month,
-                'tx_month_2' => $month,
-                'tx_month_3' => $month,
-                'period_month' => $month,
-            ]);
-            Response::json(['budgets' => $stmt->fetchAll()]);
-        } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
-                $this->ensureBudgetsSchema($pdo);
-                $spentExpression = $this->spentExpression(':tx_month_1');
-                $spentExpressionStatus = $this->spentExpression(':tx_month_2');
-                $spentExpressionVariant = $this->spentExpression(':tx_month_3');
-                $stmt = $pdo->prepare(
-                    "SELECT b.*, c.name AS category_name,
-                        {$spentExpression} AS spent,
-                        CASE
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
-                            ELSE 'В пределах'
-                        END AS status_label,
-                        CASE
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
-                            ELSE 'success'
-                        END AS status_variant
-                     FROM budgets b
-                     JOIN categories c ON c.category_id = b.category_id
-                     WHERE b.user_id = :user_id AND b.period_month = :period_month
-                     ORDER BY c.name"
-                );
-                $stmt->execute([
-                    'user_id' => Auth::userId(),
-                    'tx_month_1' => $month,
-                    'tx_month_2' => $month,
-                    'tx_month_3' => $month,
-                    'period_month' => $month,
-                ]);
-                Response::json(['budgets' => $stmt->fetchAll()]);
-                return;
-            }
-            Response::json(['error' => 'Ошибка загрузки бюджетов'], 500);
-        }
-    }
-
-    public function store()
-    {
-        $data = Request::data();
-        $categoryId = (int)(isset($data['category_id']) ? $data['category_id'] : 0);
-        $month = (string)(isset($data['period_month']) ? $data['period_month'] : '');
-        $limit = (float)(isset($data['limit_amount']) ? $data['limit_amount'] : 0);
-
-        if ($categoryId <= 0 || $month === '' || $limit <= 0) {
-            Response::json(['error' => 'Заполните данные бюджета'], 422);
-            return;
-        }
-
-        $pdo = Database::connection();
-        try {
-            $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
-            $stmt->execute([
-                'user_id' => Auth::userId(),
-                'category_id' => $categoryId,
+         }, $columns);
+ 
+         if (!in_array('period_month', $columnNames, true) && in_array('month', $columnNames, true)) {
+             $pdo->exec('ALTER TABLE budgets CHANGE month period_month VARCHAR(7) NOT NULL');
+         }
+ 
+         $indexes = $pdo->query('SHOW INDEX FROM budgets')->fetchAll();
+         $indexNames = array_values(array_unique(array_map(static function ($index) {
+             return $index['Key_name'];
+         }, $indexes)));
+ 
+         if (!in_array('uniq_budgets_user_period', $indexNames, true)) {
+             $pdo->exec('ALTER TABLE budgets ADD UNIQUE KEY uniq_budgets_user_period (user_id, category_id, period_month)');
+         }
+ 
+         if (!in_array('idx_budgets_user_period', $indexNames, true)) {
+             $pdo->exec('ALTER TABLE budgets ADD KEY idx_budgets_user_period (user_id, period_month)');
+         }
+     }
+ 
+     private function spentExpression(string $placeholder): string
+     {
+         return "IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = {$placeholder}), 0)";
+     }
+ 
++    private function hasTable($pdo, string $table): bool
++    {
++        $stmt = $pdo->prepare('SHOW TABLES LIKE :table');
++        $stmt->execute(['table' => $table]);
++        return (bool) $stmt->fetchColumn();
++    }
++
++    private function buildSpentExpressions(bool $hasTransactions): array
++    {
++        if (!$hasTransactions) {
++            return ['0', '0', '0'];
++        }
++
++        return [
++            $this->spentExpression(':tx_month_1'),
++            $this->spentExpression(':tx_month_2'),
++            $this->spentExpression(':tx_month_3'),
++        ];
++    }
++
+     public function index()
+     {
+         $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+         $pdo = Database::connection();
+         try {
+-            $spentExpression = $this->spentExpression(':tx_month_1');
+-            $spentExpressionStatus = $this->spentExpression(':tx_month_2');
+-            $spentExpressionVariant = $this->spentExpression(':tx_month_3');
++            $hasTransactions = $this->hasTable($pdo, 'transactions');
++            [$spentExpression, $spentExpressionStatus, $spentExpressionVariant] = $this->buildSpentExpressions($hasTransactions);
+             $stmt = $pdo->prepare(
+                 "SELECT b.*, c.name AS category_name,
+                     {$spentExpression} AS spent,
+                     CASE
+                         WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
+                         WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
+                         ELSE 'В пределах'
+                     END AS status_label,
+                     CASE
+                         WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
+                         WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
+                         ELSE 'success'
+                     END AS status_variant
+                  FROM budgets b
+                  JOIN categories c ON c.category_id = b.category_id
+                  WHERE b.user_id = :user_id AND b.period_month = :period_month
+                  ORDER BY c.name"
+             );
+-            $stmt->execute([
++            $params = [
+                 'user_id' => Auth::userId(),
+-                'tx_month_1' => $month,
+-                'tx_month_2' => $month,
+-                'tx_month_3' => $month,
+                 'period_month' => $month,
+-            ]);
++            ];
++            if ($hasTransactions) {
++                $params['tx_month_1'] = $month;
++                $params['tx_month_2'] = $month;
++                $params['tx_month_3'] = $month;
++            }
++            $stmt->execute($params);
+             Response::json(['budgets' => $stmt->fetchAll()]);
+         } catch (PDOException $exception) {
+             if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
+                 $this->ensureBudgetsSchema($pdo);
+-                $spentExpression = $this->spentExpression(':tx_month_1');
+-                $spentExpressionStatus = $this->spentExpression(':tx_month_2');
+-                $spentExpressionVariant = $this->spentExpression(':tx_month_3');
++                $hasTransactions = $this->hasTable($pdo, 'transactions');
++                [$spentExpression, $spentExpressionStatus, $spentExpressionVariant] = $this->buildSpentExpressions($hasTransactions);
+                 $stmt = $pdo->prepare(
+                     "SELECT b.*, c.name AS category_name,
+                         {$spentExpression} AS spent,
+                         CASE
+                             WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
+                             WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
+                             ELSE 'В пределах'
+                         END AS status_label,
+                         CASE
+                             WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
+                             WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
+                             ELSE 'success'
+                         END AS status_variant
+                      FROM budgets b
+                      JOIN categories c ON c.category_id = b.category_id
+                      WHERE b.user_id = :user_id AND b.period_month = :period_month
+                      ORDER BY c.name"
+                 );
+-                $stmt->execute([
++                $params = [
+                     'user_id' => Auth::userId(),
+-                    'tx_month_1' => $month,
+-                    'tx_month_2' => $month,
+-                    'tx_month_3' => $month,
+                     'period_month' => $month,
+-                ]);
++                ];
++                if ($hasTransactions) {
++                    $params['tx_month_1'] = $month;
++                    $params['tx_month_2'] = $month;
++                    $params['tx_month_3'] = $month;
++                }
++                $stmt->execute($params);
+                 Response::json(['budgets' => $stmt->fetchAll()]);
+                 return;
+             }
+             Response::json(['error' => 'Ошибка загрузки бюджетов'], 500);
+         }
+     }
+ 
+     public function store()
+     {
+         $data = Request::data();
+         $categoryId = (int)(isset($data['category_id']) ? $data['category_id'] : 0);
+         $month = (string)(isset($data['period_month']) ? $data['period_month'] : '');
+         $limit = (float)(isset($data['limit_amount']) ? $data['limit_amount'] : 0);
+ 
+         if ($categoryId <= 0 || $month === '' || $limit <= 0) {
+             Response::json(['error' => 'Заполните данные бюджета'], 422);
+             return;
+         }
+ 
+         $pdo = Database::connection();
+         try {
+             $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
+             $stmt->execute([
+                 'user_id' => Auth::userId(),
+                 'category_id' => $categoryId,
                 'month' => $month,
                 'amount' => $limit,
             ]);
