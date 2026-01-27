@@ -1686,14 +1686,24 @@ const initBudgets = async () => {
     const title = byId('budgets-form-title');
     const cancel = byId('budgets-cancel');
     const addButton = byId('budgets-add');
+    const categorySelect = byId('budgets-category');
 
-    const { categories } = await getJson('/api/categories?type=expense');
-    fillSelect(byId('budgets-category'), categories.map((cat) => ({ value: cat.category_id, label: cat.name })), 'Выберите');
+    if (!table || !monthPicker || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
+        return;
+    }
+
+    try {
+        const { categories } = await getJson('/api/categories?type=expense');
+        fillSelect(categorySelect, categories.map((cat) => ({ value: cat.category_id, label: cat.name })), 'Выберите');
+    } catch (error) {
+        showError('Не удалось загрузить категории.');
+        fillSelect(categorySelect, [], 'Выберите');
+    }
 
     const resetForm = () => {
         form.reset();
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
-        setFormValues(form, { period_month: month });
+        setFormValues(form, { period_month: month, budget_id: '' });
         title.textContent = 'Новый бюджет';
     };
 
@@ -1791,9 +1801,7 @@ const initBudgets = async () => {
         addButton.addEventListener('click', () => openFormModal());
     }
 
-    if (modal) {
-        modal.addEventListener('hidden.bs.modal', resetForm);
-    }
+    modal.addEventListener('hidden.bs.modal', resetForm);
 
     await load();
 };
