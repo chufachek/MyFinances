@@ -13,7 +13,7 @@ class BudgetsController
     private function budgetsQuery(): string
     {
         return "SELECT b.*, c.name AS category_name,
-                    IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :month), 0) AS spent
+                    IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = :spent_month), 0) AS spent
                  FROM budgets b
                  JOIN categories c ON c.category_id = b.category_id
                  WHERE b.user_id = :user_id AND b.period_month = :month
@@ -56,6 +56,7 @@ class BudgetsController
             $stmt->execute([
                 'user_id' => Auth::userId(),
                 'month' => $month,
+                'spent_month' => $month,
             ]);
             Response::json(['budgets' => $stmt->fetchAll()]);
         } catch (PDOException $exception) {
@@ -65,6 +66,7 @@ class BudgetsController
                 $stmt->execute([
                     'user_id' => Auth::userId(),
                     'month' => $month,
+                    'spent_month' => $month,
                 ]);
                 Response::json(['budgets' => $stmt->fetchAll()]);
                 return;
