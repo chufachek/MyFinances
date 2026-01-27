@@ -47,7 +47,22 @@ class Auth
         }
         $sql = sprintf('SELECT %s FROM users WHERE %s', implode(', ', $selectFields), $where);
         $user = DB::getRow($sql, ['email' => $email]);
-        if (!$user || !password_verify($password, $user[$passwordColumn])) {
+        if (!$user) {
+            return false;
+        }
+
+        $storedPassword = (string) $user[$passwordColumn];
+        $passwordValid = password_verify($password, $storedPassword);
+        if (!$passwordValid && $storedPassword !== '' && hash_equals($storedPassword, $password)) {
+            $passwordValid = true;
+            $newHash = password_hash($password, PASSWORD_DEFAULT);
+            DB::set(
+                sprintf('UPDATE users SET %s = :hash WHERE user_id = :id', $passwordColumn),
+                ['hash' => $newHash, 'id' => $user['user_id']]
+            );
+        }
+
+        if (!$passwordValid) {
             return false;
         }
         $_SESSION['user_id'] = (int) $user['user_id'];
@@ -56,6 +71,7 @@ class Auth
             $displayName = $user[$nameColumn];
         }
         $_SESSION['user_name'] = $displayName;
+        self::seedDefaultCategories();
         return true;
     }
 
@@ -84,7 +100,7 @@ class Auth
             return ':' . $key;
         }, array_keys($fields)));
         $userId = (int) DB::add(sprintf('INSERT INTO users (%s) VALUES (%s)', $columnsSql, $placeholders), $fields);
-        self::seedDefaultCategories($userId);
+        self::seedDefaultCategories();
         $_SESSION['user_id'] = $userId;
         $_SESSION['user_name'] = $fullName ?: $email;
         return ['success' => true, 'user_id' => $userId];
@@ -143,13 +159,8 @@ class Auth
         return null;
     }
 
-    private static function seedDefaultCategories(int $userId): void
+    private static function seedDefaultCategories(): void
     {
-        $hasDefaults = DB::getRow('SELECT category_id FROM categories WHERE is_default = 1 LIMIT 1');
-        if (!empty($hasDefaults)) {
-            return;
-        }
-
         $defaults = [
             ['name' => 'Зарплата', 'type' => 'income'],
             ['name' => 'Фриланс', 'type' => 'income'],
@@ -163,7 +174,17 @@ class Auth
             ['name' => 'Образование', 'type' => 'expense'],
         ];
 
+        $existingDefaults = DB::getAll('SELECT name, category_type FROM categories WHERE is_default = 1 AND user_id IS NULL');
+        $existingMap = [];
+        foreach ($existingDefaults as $row) {
+            $existingMap[$row['name'] . '|' . $row['category_type']] = true;
+        }
+
         foreach ($defaults as $category) {
+            $key = $category['name'] . '|' . $category['type'];
+            if (isset($existingMap[$key])) {
+                continue;
+            }
             DB::add(
                 'INSERT INTO categories (user_id, name, category_type, is_active, is_default) VALUES (NULL, :name, :type, 1, 1)',
                 [
