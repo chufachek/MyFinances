@@ -1737,13 +1737,6 @@ const initBudgets = async () => {
                 const percent = b.limit_amount > 0 ? Math.min(100, (b.spent / b.limit_amount) * 100) : 0;
                 const status = percent >= 100 ? 'Превышено' : `${percent.toFixed(0)}%`;
 
-                const progress = document.createElement('div');
-                progress.className = 'progress';
-                const bar = document.createElement('div');
-                bar.className = 'progress__bar';
-                bar.style.width = `${percent}%`;
-                progress.appendChild(bar);
-
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     openFormModal(b);
@@ -1769,7 +1762,7 @@ const initBudgets = async () => {
                 actions.className = 'table__actions';
                 actions.append(editBtn, deleteBtn);
 
-                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), progress, actions];
+                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), status, actions];
             })
         );
     };
@@ -1787,13 +1780,15 @@ const initBudgets = async () => {
                 'Бюджет обновлён',
                 { showSuccess: false }
             );
+            resetForm();
+            await load();
             closeModalWithToast(modal, 'Бюджет обновлён');
-        } else {
-            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
-            closeModalWithToast(modal, 'Бюджет создан');
+            return;
         }
+        await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
         resetForm();
         await load();
+        closeModalWithToast(modal, 'Бюджет создан');
     });
 
     cancel.addEventListener('click', () => {
