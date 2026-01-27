@@ -1397,12 +1397,36 @@ const initTransactions = async () => {
 const initBudgets = async () => {
     const table = byId('budgets-table');
     const monthPicker = byId('budgets-month');
+    const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
     const cancel = byId('budgets-cancel');
+    const addButton = byId('budgets-add');
 
     const { categories } = await getJson('/api/categories?type=expense');
     fillSelect(byId('budgets-category'), categories.map((cat) => ({ value: cat.category_id, label: cat.name })), 'Выберите');
+
+    const resetForm = () => {
+        form.reset();
+        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+        setFormValues(form, { period_month: month, budget_id: '' });
+        title.textContent = 'Новый бюджет';
+    };
+
+    const openFormModal = (budget = null) => {
+        if (budget) {
+            setFormValues(form, {
+                budget_id: budget.budget_id,
+                category_id: budget.category_id,
+                period_month: budget.period_month,
+                limit_amount: budget.limit_amount,
+            });
+            title.textContent = `Редактирование: ${budget.category_name}`;
+        } else {
+            resetForm();
+        }
+        openModal(modal);
+    };
 
     const load = async () => {
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
@@ -1424,14 +1448,7 @@ const initBudgets = async () => {
 
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        budget_id: b.budget_id,
-                        category_id: b.category_id,
-                        period_month: b.period_month,
-                        limit_amount: b.limit_amount,
-                    });
-                    title.textContent = `Редактирование: ${b.category_name}`;
-                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    openFormModal(b);
                 });
 
                 const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
@@ -1465,20 +1482,30 @@ const initBudgets = async () => {
         if (id) {
             await requestWithToast(
                 () => putJson(`/api/budgets/${id}`, data),
-                'Бюджет обновлён'
+                'Бюджет обновлён',
+                { showSuccess: false }
             );
+            closeModalWithToast(modal, 'Бюджет обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан');
+            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
+            closeModalWithToast(modal, 'Бюджет создан');
         }
-        form.reset();
-        title.textContent = 'Новый бюджет';
+        resetForm();
         await load();
     });
 
     cancel.addEventListener('click', () => {
-        form.reset();
-        title.textContent = 'Новый бюджет';
+        resetForm();
+        closeModal(modal);
     });
+
+    if (addButton) {
+        addButton.addEventListener('click', () => openFormModal());
+    }
+
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', resetForm);
+    }
 
     await load();
 };

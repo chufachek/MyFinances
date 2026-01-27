@@ -1693,7 +1693,7 @@ const initBudgets = async () => {
     const resetForm = () => {
         form.reset();
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
-        setFormValues(form, { period_month: month });
+        setFormValues(form, { period_month: month, budget_id: '' });
         title.textContent = 'Новый бюджет';
     };
 
