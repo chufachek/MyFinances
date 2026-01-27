@@ -1019,6 +1019,29 @@ const initAccounts = async () => {
         title.textContent = 'Новый счёт';
     };
 
+    const openFormModal = async (accountId = null) => {
+        resetForm();
+        if (!accountId) {
+            openModal(modal);
+            return;
+        }
+        try {
+            const { account } = await getJson(`/api/accounts/${accountId}`);
+            setFormValues(form, {
+                account_id: account.account_id,
+                name: account.name,
+                account_type: account.account_type,
+                currency_code: account.currency_code,
+                initial_balance: account.initial_balance,
+                is_active: account.is_active,
+            });
+            title.textContent = `Редактирование: ${account.name}`;
+            openModal(modal);
+        } catch (error) {
+            showError('Не удалось загрузить данные счёта.');
+        }
+    };
+
     const load = async () => {
         const { accounts } = await getJson('/api/accounts');
         renderTable(
@@ -1026,17 +1049,8 @@ const initAccounts = async () => {
             ['Название', 'Тип', 'Валюта', 'Баланс', 'Статус', 'Действия'],
             accounts.map((acc) => {
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-                editBtn.addEventListener('click', () => {
-                    setFormValues(form, {
-                        account_id: acc.account_id,
-                        name: acc.name,
-                        account_type: acc.account_type,
-                        currency_code: acc.currency_code,
-                        initial_balance: acc.initial_balance,
-                        is_active: acc.is_active,
-                    });
-                    title.textContent = `Редактирование: ${acc.name}`;
-                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                editBtn.addEventListener('click', async () => {
+                    await openFormModal(acc.account_id);
                 });
 
                 const deleteBtn = createIconButton({ icon: '🗑️', label: 'Скрыть счёт', variant: 'outline' });
@@ -1095,9 +1109,8 @@ const initAccounts = async () => {
     });
 
     if (addButton) {
-        addButton.addEventListener('click', () => {
-            resetForm();
-            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        addButton.addEventListener('click', async () => {
+            await openFormModal();
         });
     }
 

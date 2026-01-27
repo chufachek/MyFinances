@@ -1213,8 +1213,14 @@ const initAccounts = async () => {
         title.textContent = 'Новый счёт';
     };
 
-    const openFormModal = (account = null) => {
-        if (account) {
+    const openFormModal = async (accountId = null) => {
+        resetForm();
+        if (!accountId) {
+            openModal(modal);
+            return;
+        }
+        try {
+            const { account } = await getJson(`/api/accounts/${accountId}`);
             setFormValues(form, {
                 account_id: account.account_id,
                 name: account.name,
@@ -1224,10 +1230,10 @@ const initAccounts = async () => {
                 is_active: account.is_active,
             });
             title.textContent = `Редактирование: ${account.name}`;
-        } else {
-            resetForm();
+            openModal(modal);
+        } catch (error) {
+            showError('Не удалось загрузить данные счёта.');
         }
-        openModal(modal);
     };
 
     const openDeleteModal = (account) => {
@@ -1270,8 +1276,8 @@ const initAccounts = async () => {
             ['Название', 'Тип', 'Валюта', 'Баланс', 'Статус', 'Действия'],
             accounts.map((acc) => {
                 const editBtn = createActionButton('Редактировать');
-                editBtn.addEventListener('click', () => {
-                    openFormModal(acc);
+                editBtn.addEventListener('click', async () => {
+                    await openFormModal(acc.account_id);
                 });
 
                 const deleteBtn = createActionButton('Удалить', 'outline');
@@ -1376,8 +1382,8 @@ const initAccounts = async () => {
     }
 
     if (addButton) {
-        addButton.addEventListener('click', () => {
-            openFormModal();
+        addButton.addEventListener('click', async () => {
+            await openFormModal();
         });
     }
 
