@@ -145,6 +145,11 @@ class Auth
 
     private static function seedDefaultCategories(int $userId): void
     {
+        $hasDefaults = DB::getRow('SELECT category_id FROM categories WHERE is_default = 1 LIMIT 1');
+        if (!empty($hasDefaults)) {
+            return;
+        }
+
         $defaults = [
             ['name' => 'Зарплата', 'type' => 'income'],
             ['name' => 'Фриланс', 'type' => 'income'],
@@ -160,9 +165,8 @@ class Auth
 
         foreach ($defaults as $category) {
             DB::add(
-                'INSERT INTO categories (user_id, name, category_type, is_active) VALUES (:user_id, :name, :type, 1)',
+                'INSERT INTO categories (user_id, name, category_type, is_active, is_default) VALUES (NULL, :name, :type, 1, 1)',
                 [
-                    'user_id' => $userId,
                     'name' => $category['name'],
                     'type' => $category['type'],
                 ]

@@ -1217,26 +1217,31 @@ const initCategories = async () => {
             table,
             ['Название', 'Тип', 'Статус', 'Действия'],
             categories.map((cat) => {
-                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-                editBtn.addEventListener('click', () => {
-                    openFormModal(cat);
-                });
-
-                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить категорию', variant: 'outline' });
-                deleteBtn.addEventListener('click', async () => {
-                    if (!confirmAction(`Удалить категорию «${cat.name}»?`)) {
-                        return;
-                    }
-                    await requestWithToast(
-                        () => deleteJson(`/api/categories/${cat.category_id}`),
-                        'Категория удалена'
-                    );
-                    await load();
-                });
-
+                const isDefault = Number(cat.is_default) === 1;
                 const actions = document.createElement('div');
                 actions.className = 'table__actions';
-                actions.append(editBtn, deleteBtn);
+                if (isDefault) {
+                    actions.classList.add('text-muted');
+                    actions.textContent = 'По умолчанию';
+                } else {
+                    const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
+                    editBtn.addEventListener('click', () => {
+                        openFormModal(cat);
+                    });
+
+                    const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить категорию', variant: 'outline' });
+                    deleteBtn.addEventListener('click', async () => {
+                        if (!confirmAction(`Удалить категорию «${cat.name}»?`)) {
+                            return;
+                        }
+                        await requestWithToast(
+                            () => deleteJson(`/api/categories/${cat.category_id}`),
+                            'Категория удалена'
+                        );
+                        await load();
+                    });
+                    actions.append(editBtn, deleteBtn);
+                }
 
                 return [cat.name, cat.category_type === 'income' ? 'Доход' : 'Расход', cat.is_active ? 'Активна' : 'Скрыта', actions];
             })

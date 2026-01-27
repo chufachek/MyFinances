@@ -26,6 +26,20 @@ body {
     background: var(--gray-100);
 }
 
+.modal.is-open {
+    display: block;
+    background: rgba(31, 42, 31, 0.4);
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    overflow-y: auto;
+}
+
+.modal.is-open .modal-dialog {
+    margin: 1.75rem auto;
+    pointer-events: auto;
+}
+
 a {
     color: inherit;
     text-decoration: none;

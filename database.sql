@@ -24,11 +24,12 @@ CREATE TABLE accounts (
 
 CREATE TABLE categories (
   category_id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
+  user_id INT DEFAULT NULL,
   parent_category_id INT DEFAULT NULL,
   name VARCHAR(120) NOT NULL,
   category_type ENUM('income', 'expense') NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
   CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
   CONSTRAINT fk_categories_parent FOREIGN KEY (parent_category_id) REFERENCES categories(category_id) ON DELETE SET NULL,
   UNIQUE KEY uniq_categories_user_name (user_id, name),
@@ -114,17 +115,17 @@ INSERT INTO accounts (account_id, user_id, name, account_type, currency_code, in
   (3, 1, 'Карта Тинькофф', 'card', 'RUB', 25000.00, 1),
   (4, 1, 'Накопительный', 'bank', 'RUB', 210000.00, 1);
 
-INSERT INTO categories (category_id, user_id, name, category_type, is_active) VALUES
-  (1, 1, 'Зарплата', 'income', 1),
-  (2, 1, 'Фриланс', 'income', 1),
-  (3, 1, 'Подарки', 'income', 1),
-  (4, 1, 'Продукты', 'expense', 1),
-  (5, 1, 'Транспорт', 'expense', 1),
-  (6, 1, 'Кафе', 'expense', 1),
-  (7, 1, 'Жильё', 'expense', 1),
-  (8, 1, 'Развлечения', 'expense', 1),
-  (9, 1, 'Здоровье', 'expense', 1),
-  (10, 1, 'Образование', 'expense', 1);
+INSERT INTO categories (category_id, user_id, name, category_type, is_active, is_default) VALUES
+  (1, NULL, 'Зарплата', 'income', 1, 1),
+  (2, NULL, 'Фриланс', 'income', 1, 1),
+  (3, NULL, 'Подарки', 'income', 1, 1),
+  (4, NULL, 'Продукты', 'expense', 1, 1),
+  (5, NULL, 'Транспорт', 'expense', 1, 1),
+  (6, NULL, 'Кафе', 'expense', 1, 1),
+  (7, NULL, 'Жильё', 'expense', 1, 1),
+  (8, NULL, 'Развлечения', 'expense', 1, 1),
+  (9, NULL, 'Здоровье', 'expense', 1, 1),
+  (10, NULL, 'Образование', 'expense', 1, 1);
 
 INSERT INTO merchants (merchant_id, user_id, name) VALUES
   (1, 1, 'Пятёрочка'),

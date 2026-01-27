@@ -158,9 +158,12 @@ class TransactionsController
 
         if ($categoryId) {
             $pdo = Database::connection();
-            $stmt = $pdo->prepare('SELECT category_type FROM categories WHERE category_id = :id AND user_id = :user_id');
+            $stmt = $pdo->prepare('SELECT category_type FROM categories WHERE category_id = :id AND (user_id = :user_id OR is_default = 1)');
             $stmt->execute(['id' => $categoryId, 'user_id' => Auth::userId()]);
             $category = $stmt->fetch();
+            if (!$category) {
+                return ['error' => 'Категория не найдена'];
+            }
             if ($category && $category['category_type'] !== $txType) {
                 return ['error' => 'Категория не совпадает с типом операции'];
             }
