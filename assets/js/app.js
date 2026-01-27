@@ -68,107 +68,6 @@ const requestWithToast = async (callback, successMessage, options = {}) => {
 
 const confirmAction = (message) => window.confirm(message);
 
-const getBootstrapModal = (modal) => {
-    if (!modal) {
-        return null;
-    }
-    if (window.bootstrap?.Modal) {
-        return window.bootstrap.Modal.getOrCreateInstance(modal);
-    }
-    return null;
-};
-
-const openModal = (modal) => {
-    if (!modal) {
-        return;
-    }
-    const instance = getBootstrapModal(modal);
-    if (instance) {
-        instance.show();
-        return;
-    }
-    modal.classList.add('is-open');
-    modal.setAttribute('aria-hidden', 'false');
-};
-
-const closeModal = (modal) => {
-    if (!modal) {
-        return;
-    }
-    const instance = getBootstrapModal(modal);
-    if (instance) {
-        instance.hide();
-        return;
-    }
-    modal.classList.remove('is-open');
-    modal.setAttribute('aria-hidden', 'true');
-};
-
-const ensureInfoModal = () => {
-    let modal = byId('info-modal');
-    if (modal) {
-        return modal;
-    }
-    modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'info-modal';
-    modal.tabIndex = -1;
-    modal.setAttribute('aria-hidden', 'true');
-    modal.innerHTML = `
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <p class="text-muted mb-1">Уведомление</p>
-                        <h3 class="modal-title fs-5" id="info-modal-title">Готово</h3>
-                    </div>
-                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="info-modal-message"></p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" type="button" data-bs-dismiss="modal" data-action="close-modal">Ок</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    return modal;
-};
-
-const showInfoModal = (message, options = {}) => {
-    const modal = ensureInfoModal();
-    const title = byId('info-modal-title');
-    const text = byId('info-modal-message');
-    if (title) {
-        title.textContent = options.title ?? 'Готово';
-    }
-    if (text) {
-        text.textContent = message ?? '';
-    }
-    openModal(modal);
-};
-
-const closeModalWithInfo = (modal, message, options = {}) => {
-    if (!modal) {
-        showInfoModal(message, options);
-        return;
-    }
-    const instance = getBootstrapModal(modal);
-    if (instance) {
-        const handleHidden = () => {
-            modal.removeEventListener('hidden.bs.modal', handleHidden);
-            showInfoModal(message, options);
-        };
-        modal.addEventListener('hidden.bs.modal', handleHidden);
-        instance.hide();
-        return;
-    }
-    closeModal(modal);
-    showInfoModal(message, options);
-};
-
 const createIconButton = ({ icon, label, variant = 'outline' }) => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1109,7 +1008,6 @@ const initDashboard = async () => {
 
 const initAccounts = async () => {
     const table = byId('accounts-table');
-    const modal = byId('accounts-modal');
     const form = byId('accounts-form');
     const title = byId('accounts-form-title');
     const cancel = byId('accounts-cancel');
@@ -1174,8 +1072,7 @@ const initAccounts = async () => {
                 'Счёт обновлён'
             );
         } else {
-            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан', { showSuccess: false });
-            closeModalWithInfo(modal, 'Успешно создано!', { title: 'Счёт создан' });
+            await requestWithToast(() => postJson('/api/accounts', data), 'Счёт создан');
         }
         form.reset();
         title.textContent = 'Новый счёт';
