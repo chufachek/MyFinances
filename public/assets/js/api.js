@@ -13,30 +13,59 @@ const withBasePath = (url) => {
     return `${basePath}${url}`;
 };
 
-export async function apiRequest(url, options = {}) {
-    const response = await fetch(withBasePath(url), {
-        headers: {
-            'Content-Type': 'application/json',
-            ...(options.headers ?? {}),
-        },
-        credentials: 'same-origin',
-        ...options,
+export function apiRequest(url, options = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers ?? {}),
+    };
+
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const method = options.method ?? 'GET';
+        xhr.open(method, withBasePath(url), true);
+        xhr.withCredentials = options.credentials === 'include' || options.credentials === 'same-origin';
+
+        Object.entries(headers).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                xhr.setRequestHeader(key, value);
+            }
+        });
+
+        xhr.onerror = () => {
+            reject(new Error('Network response was not ok'));
+        };
+
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState !== 4) {
+                return;
+            }
+
+            const responseText = xhr.responseText || '';
+            if (xhr.status >= 200 && xhr.status < 300) {
+                if (!responseText) {
+                    resolve({});
+                    return;
+                }
+                try {
+                    resolve(JSON.parse(responseText));
+                } catch (error) {
+                    reject(new Error('Invalid JSON response'));
+                }
+                return;
+            }
+
+            let errorMessage = responseText || 'Network response was not ok';
+            try {
+                const data = JSON.parse(responseText);
+                errorMessage = data.error || data.message || errorMessage;
+            } catch (error) {
+                // keep original message
+            }
+            reject(new Error(errorMessage));
+        };
+
+        xhr.send(options.body ?? null);
     });
-
-    if (!response.ok) {
-        const message = await response.text();
-        let errorMessage = message || 'Network response was not ok';
-        try {
-            const data = JSON.parse(message);
-            errorMessage = data.error || data.message || errorMessage;
-        } catch (error) {
-            // keep original message
-        }
-        throw new Error(errorMessage);
-    }
-
-    const text = await response.text();
-    return text ? JSON.parse(text) : {};
 }
 
 export async function getJson(url) {
