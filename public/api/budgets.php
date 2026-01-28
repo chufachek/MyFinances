@@ -91,19 +91,16 @@ try {
         $hasTransactions = $hasTable($pdo, 'transactions');
         if ($hasTransactions) {
             $stmt = $pdo->prepare(
-                "SELECT b.*, c.name AS category_name, IFNULL(t.spent, 0) AS spent
+                "SELECT b.*, c.name AS category_name, IFNULL(SUM(t.amount), 0) AS spent
                  FROM budgets b
                  JOIN categories c ON c.category_id = b.category_id
-                 LEFT JOIN (
-                    SELECT user_id, category_id, DATE_FORMAT(tx_date, '%Y-%m') AS period_month, SUM(amount) AS spent
-                    FROM transactions
-                    WHERE tx_type = 'expense'
-                    GROUP BY user_id, category_id, DATE_FORMAT(tx_date, '%Y-%m')
-                 ) t
+                 LEFT JOIN transactions t
                     ON t.user_id = b.user_id
                     AND t.category_id = b.category_id
-                    AND t.period_month = b.period_month
+                    AND t.tx_type = 'expense'
+                    AND DATE_FORMAT(t.tx_date, '%Y-%m') = b.period_month
                  WHERE b.user_id = :user_id
+                 GROUP BY b.budget_id
                  ORDER BY b.period_month DESC, c.name"
             );
         } else {
