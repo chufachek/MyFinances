@@ -4,7 +4,6 @@ require __DIR__ . '/../app/bootstrap.php';
 
 use App\Controllers\AccountsController;
 use App\Controllers\AuthController;
-use App\Controllers\BudgetsController;
 use App\Controllers\CategoriesController;
 use App\Controllers\GoalsController;
 use App\Controllers\ReportsController;
@@ -144,11 +143,6 @@ $router->get('/api/categories', [new CategoriesController(), 'index']);
 $router->post('/api/categories', [new CategoriesController(), 'store']);
 $router->put('/api/categories/{id}', [new CategoriesController(), 'update']);
 $router->delete('/api/categories/{id}', [new CategoriesController(), 'delete']);
-
-$router->get('/api/budgets', [new BudgetsController(), 'index']);
-$router->post('/api/budgets', [new BudgetsController(), 'store']);
-$router->put('/api/budgets/{id}', [new BudgetsController(), 'update']);
-$router->delete('/api/budgets/{id}', [new BudgetsController(), 'delete']);
 
 $router->get('/api/transactions', [new TransactionsController(), 'index']);
 $router->post('/api/transactions', [new TransactionsController(), 'store']);
