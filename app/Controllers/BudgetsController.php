@@ -10,21 +10,6 @@ use PDOException;
 
 class BudgetsController
 {
-    private function isMissingTableError(PDOException $exception): bool
-    {
-        return $exception->getCode() === '42S02';
-    }
-
-    private function isDuplicateKeyError(PDOException $exception): bool
-    {
-        return $exception->getCode() === '23000';
-    }
-
-    private function isUnknownColumnError(PDOException $exception): bool
-    {
-        return $exception->getCode() === '42S22';
-    }
-
     private function ensureBudgetsTable($pdo): void
     {
         $pdo->exec(
@@ -42,38 +27,6 @@ class BudgetsController
         );
     }
 
-    private function ensureBudgetsSchema($pdo): void
-    {
-        $this->ensureBudgetsTable($pdo);
-
-        $columns = $pdo->query('SHOW COLUMNS FROM budgets')->fetchAll();
-        $columnNames = array_map(static function ($column) {
-            return $column['Field'];
-        }, $columns);
-
-        if (!in_array('period_month', $columnNames, true) && in_array('month', $columnNames, true)) {
-            $pdo->exec('ALTER TABLE budgets CHANGE month period_month VARCHAR(7) NOT NULL');
-        }
-
-        $indexes = $pdo->query('SHOW INDEX FROM budgets')->fetchAll();
-        $indexNames = array_values(array_unique(array_map(static function ($index) {
-            return $index['Key_name'];
-        }, $indexes)));
-
-        if (!in_array('uniq_budgets_user_period', $indexNames, true)) {
-            $pdo->exec('ALTER TABLE budgets ADD UNIQUE KEY uniq_budgets_user_period (user_id, category_id, period_month)');
-        }
-
-        if (!in_array('idx_budgets_user_period', $indexNames, true)) {
-            $pdo->exec('ALTER TABLE budgets ADD KEY idx_budgets_user_period (user_id, period_month)');
-        }
-    }
-
-    private function spentExpression(string $placeholder): string
-    {
-        return "IFNULL((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = b.user_id AND t.category_id = b.category_id AND t.tx_type = 'expense' AND DATE_FORMAT(t.tx_date, '%Y-%m') = {$placeholder}), 0)";
-    }
-
     private function hasTable($pdo, string $table): bool
     {
         $stmt = $pdo->prepare('SHOW TABLES LIKE :table');
@@ -81,17 +34,20 @@ class BudgetsController
         return (bool) $stmt->fetchColumn();
     }
 
-    private function buildSpentExpressions(bool $hasTransactions): array
+    private function buildStatus(float $limit, float $spent): array
     {
-        if (!$hasTransactions) {
-            return ['0', '0', '0'];
+        if ($limit <= 0) {
+            return ['label' => 'В пределах', 'variant' => 'success'];
         }
 
-        return [
-            $this->spentExpression(':tx_month_1'),
-            $this->spentExpression(':tx_month_2'),
-            $this->spentExpression(':tx_month_3'),
-        ];
+        $percent = ($spent / $limit) * 100;
+        if ($percent >= 100) {
+            return ['label' => 'Превышено', 'variant' => 'danger'];
+        }
+        if ($percent >= 85) {
+            return ['label' => 'Почти лимит', 'variant' => 'warning'];
+        }
+        return ['label' => 'В пределах', 'variant' => 'success'];
     }
 
     public function index()
@@ -99,73 +55,47 @@ class BudgetsController
         $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
         $pdo = Database::connection();
         try {
+            $this->ensureBudgetsTable($pdo);
             $hasTransactions = $this->hasTable($pdo, 'transactions');
-            [$spentExpression, $spentExpressionStatus, $spentExpressionVariant] = $this->buildSpentExpressions($hasTransactions);
-            $stmt = $pdo->prepare(
-                "SELECT b.*, c.name AS category_name,
-                    {$spentExpression} AS spent,
-                    CASE
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
-                        ELSE 'В пределах'
-                    END AS status_label,
-                    CASE
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
-                        WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
-                        ELSE 'success'
-                    END AS status_variant
-                 FROM budgets b
-                 JOIN categories c ON c.category_id = b.category_id
-                 WHERE b.user_id = :user_id AND b.period_month = :period_month
-                 ORDER BY c.name"
-            );
-            $params = [
-                'user_id' => Auth::userId(),
-                'period_month' => $month,
-            ];
             if ($hasTransactions) {
-                $params['tx_month_1'] = $month;
-                $params['tx_month_2'] = $month;
-                $params['tx_month_3'] = $month;
-            }
-            $stmt->execute($params);
-            Response::json(['budgets' => $stmt->fetchAll()]);
-        } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
-                $this->ensureBudgetsSchema($pdo);
-                $hasTransactions = $this->hasTable($pdo, 'transactions');
-                [$spentExpression, $spentExpressionStatus, $spentExpressionVariant] = $this->buildSpentExpressions($hasTransactions);
                 $stmt = $pdo->prepare(
-                    "SELECT b.*, c.name AS category_name,
-                        {$spentExpression} AS spent,
-                        CASE
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 100 THEN 'Превышено'
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionStatus} / b.limit_amount) * 100 >= 85 THEN 'Почти лимит'
-                            ELSE 'В пределах'
-                        END AS status_label,
-                        CASE
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 100 THEN 'danger'
-                            WHEN b.limit_amount > 0 AND ({$spentExpressionVariant} / b.limit_amount) * 100 >= 85 THEN 'warning'
-                            ELSE 'success'
-                        END AS status_variant
+                    "SELECT b.*, c.name AS category_name, IFNULL(SUM(t.amount), 0) AS spent
+                     FROM budgets b
+                     JOIN categories c ON c.category_id = b.category_id
+                     LEFT JOIN transactions t
+                        ON t.user_id = b.user_id
+                        AND t.category_id = b.category_id
+                        AND t.tx_type = 'expense'
+                        AND DATE_FORMAT(t.tx_date, '%Y-%m') = :period_month
+                     WHERE b.user_id = :user_id AND b.period_month = :period_month
+                     GROUP BY b.budget_id
+                     ORDER BY c.name"
+                );
+            } else {
+                $stmt = $pdo->prepare(
+                    "SELECT b.*, c.name AS category_name, 0 AS spent
                      FROM budgets b
                      JOIN categories c ON c.category_id = b.category_id
                      WHERE b.user_id = :user_id AND b.period_month = :period_month
                      ORDER BY c.name"
                 );
-                $params = [
-                    'user_id' => Auth::userId(),
-                    'period_month' => $month,
-                ];
-                if ($hasTransactions) {
-                    $params['tx_month_1'] = $month;
-                    $params['tx_month_2'] = $month;
-                    $params['tx_month_3'] = $month;
-                }
-                $stmt->execute($params);
-                Response::json(['budgets' => $stmt->fetchAll()]);
-                return;
             }
+            $params = [
+                'user_id' => Auth::userId(),
+                'period_month' => $month,
+            ];
+            $stmt->execute($params);
+            $budgets = $stmt->fetchAll();
+            foreach ($budgets as &$budget) {
+                $limit = (float) $budget['limit_amount'];
+                $spent = (float) $budget['spent'];
+                $status = $this->buildStatus($limit, $spent);
+                $budget['status_label'] = $status['label'];
+                $budget['status_variant'] = $status['variant'];
+            }
+            unset($budget);
+            Response::json(['budgets' => $budgets]);
+        } catch (PDOException $exception) {
             Response::json(['error' => 'Ошибка загрузки бюджетов'], 500);
         }
     }
@@ -184,6 +114,7 @@ class BudgetsController
 
         $pdo = Database::connection();
         try {
+            $this->ensureBudgetsTable($pdo);
             $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
             $stmt->execute([
                 'user_id' => Auth::userId(),
@@ -193,19 +124,7 @@ class BudgetsController
             ]);
             Response::json(['success' => true]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
-                $this->ensureBudgetsSchema($pdo);
-                $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
-                $stmt->execute([
-                    'user_id' => Auth::userId(),
-                    'category_id' => $categoryId,
-                    'month' => $month,
-                    'amount' => $limit,
-                ]);
-                Response::json(['success' => true]);
-                return;
-            }
-            if ($this->isDuplicateKeyError($exception)) {
+            if ($exception->getCode() === '23000') {
                 Response::json(['error' => 'Бюджет на эту категорию и месяц уже существует'], 409);
                 return;
             }
@@ -220,8 +139,14 @@ class BudgetsController
         $month = (string)(isset($data['period_month']) ? $data['period_month'] : '');
         $limit = (float)(isset($data['limit_amount']) ? $data['limit_amount'] : 0);
 
+        if ($categoryId <= 0 || $month === '' || $limit <= 0) {
+            Response::json(['error' => 'Заполните данные бюджета'], 422);
+            return;
+        }
+
         $pdo = Database::connection();
         try {
+            $this->ensureBudgetsTable($pdo);
             $stmt = $pdo->prepare('UPDATE budgets SET category_id = :category_id, period_month = :month, limit_amount = :amount WHERE budget_id = :id AND user_id = :user_id');
             $stmt->execute([
                 'category_id' => $categoryId,
@@ -232,19 +157,6 @@ class BudgetsController
             ]);
             Response::json(['success' => true]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception) || $this->isUnknownColumnError($exception)) {
-                $this->ensureBudgetsSchema($pdo);
-                $stmt = $pdo->prepare('UPDATE budgets SET category_id = :category_id, period_month = :month, limit_amount = :amount WHERE budget_id = :id AND user_id = :user_id');
-                $stmt->execute([
-                    'category_id' => $categoryId,
-                    'month' => $month,
-                    'amount' => $limit,
-                    'id' => $id,
-                    'user_id' => Auth::userId(),
-                ]);
-                Response::json(['success' => true]);
-                return;
-            }
             Response::json(['error' => 'Ошибка обновления бюджета'], 500);
         }
     }
@@ -253,17 +165,11 @@ class BudgetsController
     {
         $pdo = Database::connection();
         try {
+            $this->ensureBudgetsTable($pdo);
             $stmt = $pdo->prepare('DELETE FROM budgets WHERE budget_id = :id AND user_id = :user_id');
             $stmt->execute(['id' => $id, 'user_id' => Auth::userId()]);
             Response::json(['success' => true]);
         } catch (PDOException $exception) {
-            if ($this->isMissingTableError($exception)) {
-                $this->ensureBudgetsTable($pdo);
-                $stmt = $pdo->prepare('DELETE FROM budgets WHERE budget_id = :id AND user_id = :user_id');
-                $stmt->execute(['id' => $id, 'user_id' => Auth::userId()]);
-                Response::json(['success' => true]);
-                return;
-            }
             Response::json(['error' => 'Ошибка удаления бюджета'], 500);
         }
     }
