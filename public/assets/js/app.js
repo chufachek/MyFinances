@@ -984,7 +984,7 @@ const initDashboard = async () => {
                           )}&groupBy=month&type=expense`
                       )
                     : Promise.resolve({ labels: [], expense: [] }),
-                budgetList ? getJson(`/api/budgets?month=${month}`) : Promise.resolve({ budgets: [] }),
+                budgetList ? getJson('/api/budgets') : Promise.resolve({ budgets: [] }),
             ]);
 
         if (
@@ -1074,7 +1074,11 @@ const initDashboard = async () => {
 
         if (budgetList) {
             budgetList.innerHTML = '';
-            const list = (budgets.budgets || []).filter((item) => item.period_month === month);
+            const availableBudgets = budgets.budgets || [];
+            const availableMonths = [...new Set(availableBudgets.map((item) => item.period_month))].sort();
+            const fallbackMonth = availableMonths[availableMonths.length - 1];
+            const targetMonth = availableMonths.includes(month) ? month : fallbackMonth;
+            const list = availableBudgets.filter((item) => item.period_month === targetMonth);
             if (list.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
@@ -1889,13 +1893,18 @@ const initBudgets = async () => {
 
     const load = async () => {
         try {
-            const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+            const { budgets } = await getJson('/api/budgets');
+            const availableMonths = [...new Set((budgets || []).map((item) => item.period_month))].sort();
+            let month = monthPicker.value || new Date().toISOString().slice(0, 7);
+            if (availableMonths.length > 0 && !availableMonths.includes(month)) {
+                month = availableMonths[availableMonths.length - 1];
+            }
             monthPicker.value = month;
-            const { budgets } = await getJson(`/api/budgets?month=${month}`);
+            const filteredBudgets = (budgets || []).filter((budget) => budget.period_month === month);
             renderTable(
                 table,
                 ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
-                budgets.map((budget) => buildBudgetRow(budget))
+                filteredBudgets.map((budget) => buildBudgetRow(budget))
             );
         } catch (error) {
             showError('Не удалось загрузить бюджеты.');
