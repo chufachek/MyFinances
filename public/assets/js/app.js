@@ -984,7 +984,7 @@ const initDashboard = async () => {
                           )}&groupBy=month&type=expense`
                       )
                     : Promise.resolve({ labels: [], expense: [] }),
-                budgetList ? getJson('/api/budgets') : Promise.resolve({ budgets: [] }),
+                budgetList ? getJson('/api/budgets.php') : Promise.resolve({ budgets: [] }),
             ]);
 
         if (
@@ -1870,7 +1870,10 @@ const initBudgets = async () => {
             if (!confirmed) {
                 return;
             }
-            await requestWithToast(() => deleteJson(`/api/budgets/${budget.budget_id}`), 'Бюджет удалён');
+            await requestWithToast(
+                () => deleteJson(`/api/budgets.php?id=${budget.budget_id}`),
+                'Бюджет удалён'
+            );
             await load();
         });
 
@@ -1892,7 +1895,7 @@ const initBudgets = async () => {
 
     const load = async () => {
         try {
-            const { budgets } = await getJson('/api/budgets');
+            const { budgets } = await getJson('/api/budgets.php');
             const sortedBudgets = [...(budgets || [])].sort((a, b) => b.period_month.localeCompare(a.period_month));
             renderTable(
                 table,
@@ -1912,7 +1915,7 @@ const initBudgets = async () => {
         delete data.budget_id;
         if (id) {
             await requestWithToast(
-                () => putJson(`/api/budgets/${id}`, data),
+                () => putJson(`/api/budgets.php?id=${id}`, data),
                 'Бюджет обновлён',
                 { showSuccess: false }
             );
@@ -1921,7 +1924,7 @@ const initBudgets = async () => {
             closeModalWithToast(modal, 'Бюджет обновлён');
             return;
         }
-        await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
+        await requestWithToast(() => postJson('/api/budgets.php', data), 'Бюджет создан', { showSuccess: false });
         resetForm();
         await load();
         closeModalWithToast(modal, 'Бюджет создан');
