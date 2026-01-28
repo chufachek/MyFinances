@@ -9,11 +9,8 @@
 
     <div class="panel">
         <div class="panel__header">
-            <h3>Бюджеты за месяц</h3>
-            <label class="field">
-                <span>Месяц</span>
-                <input type="month" id="budgets-month">
-            </label>
+            <h3>Все бюджеты</h3>
+            <p class="text-muted">Список отсортирован от текущего месяца к прошлым.</p>
         </div>
         <div id="budgets-table" class="table"></div>
     </div>
