@@ -19,6 +19,19 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount);
 };
 
+const getBudgetStatus = (limitValue, spentValue) => {
+    const limit = Number(limitValue) || 0;
+    const spent = Number(spentValue) || 0;
+    const percent = limit > 0 ? (spent / limit) * 100 : 0;
+    if (percent >= 100) {
+        return { label: 'Превышено', variant: 'danger', percent, limit, spent };
+    }
+    if (percent >= 85) {
+        return { label: 'Почти лимит', variant: 'warning', percent, limit, spent };
+    }
+    return { label: 'В пределах', variant: 'success', percent, limit, spent };
+};
+
 const accountTypeLabels = {
     cash: 'Наличные',
     card: 'Карта',
@@ -1070,14 +1083,15 @@ const initDashboard = async () => {
             } else {
                 list
                     .map((item) => {
-                        const limit = Number(item.limit_amount) || 0;
-                        const spent = Number(item.spent) || 0;
-                        const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                        const status = getBudgetStatus(item.limit_amount, item.spent);
+                        const percent = Math.round(status.percent);
                         return {
                             ...item,
-                            limit,
-                            spent,
+                            limit: status.limit,
+                            spent: status.spent,
                             percent,
+                            status_label: status.label,
+                            status_variant: status.variant,
                         };
                     })
                     .sort((a, b) => b.percent - a.percent)
@@ -1802,13 +1816,14 @@ const initBudgets = async () => {
     };
 
     const buildStatusCell = (budget) => {
+        const status = getBudgetStatus(budget.limit_amount, budget.spent);
         const badge = document.createElement('span');
-        const variant = budget.status_variant || 'secondary';
+        const variant = status.variant || 'secondary';
         badge.className = `badge bg-${variant}`;
         if (variant === 'warning') {
             badge.classList.add('text-dark');
         }
-        badge.textContent = budget.status_label || 'Статус';
+        badge.textContent = status.label || 'Статус';
         return badge;
     };
 
