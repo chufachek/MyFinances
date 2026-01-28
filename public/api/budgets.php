@@ -23,8 +23,7 @@ $respond = static function (array $payload, int $status = 200): void {
 };
 
 $hasTable = static function ($pdo, string $table): bool {
-    $stmt = $pdo->prepare('SHOW TABLES LIKE :table');
-    $stmt->execute(['table' => $table]);
+    $stmt = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote($table));
     return (bool) $stmt->fetchColumn();
 };
 
