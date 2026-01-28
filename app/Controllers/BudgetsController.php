@@ -12,6 +12,18 @@ class BudgetsController
 {
     private function ensureBudgetsTable($pdo): void
     {
+        $hasUsers = $this->hasTable($pdo, 'users');
+        $hasCategories = $this->hasTable($pdo, 'categories');
+        $constraints = '';
+
+        if ($hasUsers) {
+            $constraints .= ', CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE';
+        }
+
+        if ($hasCategories) {
+            $constraints .= ', CONSTRAINT fk_budgets_category FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE';
+        }
+
         $pdo->exec(
             'CREATE TABLE IF NOT EXISTS budgets (
                 budget_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -19,11 +31,10 @@ class BudgetsController
                 category_id INT NOT NULL,
                 period_month VARCHAR(7) NOT NULL,
                 limit_amount DECIMAL(12,2) NOT NULL,
-                CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                CONSTRAINT fk_budgets_category FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
                 UNIQUE KEY uniq_budgets_user_period (user_id, category_id, period_month),
-                KEY idx_budgets_user_period (user_id, period_month)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+                KEY idx_budgets_user_period (user_id, period_month)' .
+                $constraints .
+            ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
     }
 
@@ -55,6 +66,11 @@ class BudgetsController
         $pdo = Database::connection();
         try {
             $this->ensureBudgetsTable($pdo);
+            $hasCategories = $this->hasTable($pdo, 'categories');
+            if (!$hasCategories) {
+                Response::json(['budgets' => []]);
+                return;
+            }
             $hasTransactions = $this->hasTable($pdo, 'transactions');
             $month = isset($_GET['month']) ? trim($_GET['month']) : '';
             $monthFilter = $month !== '' ? ' AND b.period_month = :month' : '';
@@ -99,7 +115,7 @@ class BudgetsController
             unset($budget);
             Response::json(['budgets' => $budgets]);
         } catch (PDOException $exception) {
-            Response::json(['error' => 'Ошибка загрузки бюджетов'], 500);
+            Response::json(['budgets' => []]);
         }
     }
 
@@ -118,6 +134,10 @@ class BudgetsController
         $pdo = Database::connection();
         try {
             $this->ensureBudgetsTable($pdo);
+            if (!$this->hasTable($pdo, 'categories')) {
+                Response::json(['error' => 'Сначала создайте категории'], 422);
+                return;
+            }
             $stmt = $pdo->prepare('INSERT INTO budgets (user_id, category_id, period_month, limit_amount) VALUES (:user_id, :category_id, :month, :amount)');
             $stmt->execute([
                 'user_id' => Auth::userId(),
@@ -150,6 +170,10 @@ class BudgetsController
         $pdo = Database::connection();
         try {
             $this->ensureBudgetsTable($pdo);
+            if (!$this->hasTable($pdo, 'categories')) {
+                Response::json(['error' => 'Сначала создайте категории'], 422);
+                return;
+            }
             $stmt = $pdo->prepare('UPDATE budgets SET category_id = :category_id, period_month = :month, limit_amount = :amount WHERE budget_id = :id AND user_id = :user_id');
             $stmt->execute([
                 'category_id' => $categoryId,
