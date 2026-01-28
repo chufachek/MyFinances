@@ -1432,7 +1432,8 @@ const initTransactions = async () => {
 };
 
 const initBudgets = async () => {
-    const table = byId('budgets-table');
+    const currentTable = byId('budgets-current-table');
+    const historyTable = byId('budgets-history-table');
     const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
@@ -1440,7 +1441,7 @@ const initBudgets = async () => {
     const addButton = byId('budgets-add');
     const categorySelect = byId('budgets-category');
 
-    if (!table || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
+    if (!currentTable || !historyTable || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
         return;
     }
 
@@ -1477,26 +1478,47 @@ const initBudgets = async () => {
 
     const buildProgress = (budget) => {
         const percent = budget.limit_amount > 0 ? Math.min(100, (budget.spent / budget.limit_amount) * 100) : 0;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'stack';
+        const size = 32;
+        const stroke = 4;
+        const radius = (size - stroke) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
 
-        const progress = document.createElement('div');
-        progress.className = 'progress';
-        const bar = document.createElement('div');
-        bar.className = 'progress__bar';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'budget-progress';
         if (budget.status_variant === 'danger') {
-            bar.classList.add('progress__bar--danger');
+            wrapper.classList.add('budget-progress--danger');
         } else if (budget.status_variant === 'warning') {
-            bar.classList.add('progress__bar--warning');
+            wrapper.classList.add('budget-progress--warning');
         }
-        bar.style.width = `${percent}%`;
-        progress.appendChild(bar);
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.classList.add('budget-progress__ring');
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+
+        const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        track.classList.add('budget-progress__track');
+        track.setAttribute('cx', size / 2);
+        track.setAttribute('cy', size / 2);
+        track.setAttribute('r', radius);
+
+        const value = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        value.classList.add('budget-progress__value');
+        value.setAttribute('cx', size / 2);
+        value.setAttribute('cy', size / 2);
+        value.setAttribute('r', radius);
+        value.setAttribute('stroke-dasharray', `${circumference} ${circumference}`);
+        value.setAttribute('stroke-dashoffset', offset);
+
+        svg.append(track, value);
 
         const label = document.createElement('span');
-        label.className = 'text-muted';
+        label.className = 'budget-progress__text';
         label.textContent = `${percent.toFixed(0)}%`;
 
-        wrapper.append(progress, label);
+        wrapper.append(svg, label);
         return wrapper;
     };
 
@@ -1516,45 +1538,60 @@ const initBudgets = async () => {
         try {
             const { budgets } = await getJson('/api/budgets.php');
             const sortedBudgets = [...(budgets || [])].sort((a, b) => b.period_month.localeCompare(a.period_month));
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const currentBudgets = sortedBudgets.filter((budget) => budget.period_month === currentMonth);
+            const historyBudgets = sortedBudgets.filter((budget) => budget.period_month !== currentMonth);
+
+            const buildActions = (budget) => {
+                const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
+                editBtn.addEventListener('click', () => {
+                    openFormModal(budget);
+                });
+
+                const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
+                deleteBtn.addEventListener('click', async () => {
+                    if (!confirmAction('Удалить бюджет?')) {
+                        return;
+                    }
+                    await requestWithToast(() => deleteJson(`/api/budgets.php?id=${budget.budget_id}`), 'Бюджет удалён');
+                    await load();
+                });
+
+                const actions = document.createElement('div');
+                actions.className = 'table__actions';
+                actions.append(editBtn, deleteBtn);
+                return actions;
+            };
+
             renderTable(
-                table,
-                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
-                sortedBudgets.map((b) => {
-                    const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-                    editBtn.addEventListener('click', () => {
-                        openFormModal(b);
-                    });
+                currentTable,
+                ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
+                currentBudgets.map((budget) => [
+                    budget.category_name,
+                    formatCurrency(budget.limit_amount),
+                    formatCurrency(budget.spent),
+                    buildProgress(budget),
+                    buildStatusBadge(budget),
+                    buildActions(budget),
+                ])
+            );
 
-                    const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
-                    deleteBtn.addEventListener('click', async () => {
-                        if (!confirmAction('Удалить бюджет?')) {
-                            return;
-                        }
-                        await requestWithToast(
-                            () => deleteJson(`/api/budgets.php?id=${b.budget_id}`),
-                            'Бюджет удалён'
-                        );
-                        await load();
-                    });
-
-                    const actions = document.createElement('div');
-                    actions.className = 'table__actions';
-                    actions.append(editBtn, deleteBtn);
-
-                    return [
-                        b.period_month,
-                        b.category_name,
-                        formatCurrency(b.limit_amount),
-                        formatCurrency(b.spent),
-                        buildProgress(b),
-                        buildStatusBadge(b),
-                        actions,
-                    ];
-                })
+            renderTable(
+                historyTable,
+                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
+                historyBudgets.map((budget) => [
+                    budget.period_month,
+                    budget.category_name,
+                    formatCurrency(budget.limit_amount),
+                    formatCurrency(budget.spent),
+                    buildStatusBadge(budget),
+                    buildActions(budget),
+                ])
             );
         } catch (error) {
             showError('Не удалось загрузить бюджеты.');
-            renderTable(table, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
+            renderTable(currentTable, ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
+            renderTable(historyTable, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
         }
     };
 

@@ -9,10 +9,18 @@
 
     <div class="panel">
         <div class="panel__header">
-            <h3>Все бюджеты</h3>
-            <p class="text-muted">Список отсортирован от текущего месяца к прошлым.</p>
+            <h3>Бюджеты текущего месяца</h3>
+            <p class="text-muted">Лимиты и текущие траты за выбранный месяц.</p>
         </div>
-        <div id="budgets-table" class="table"></div>
+        <div id="budgets-current-table" class="table"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel__header">
+            <h3>Бюджеты прошлых месяцев</h3>
+            <p class="text-muted">Архив бюджетов за предыдущие периоды.</p>
+        </div>
+        <div id="budgets-history-table" class="table"></div>
     </div>
 
     <div class="modal fade" id="budgets-modal" tabindex="-1" aria-hidden="true">

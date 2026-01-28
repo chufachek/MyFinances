@@ -614,6 +614,46 @@ a {
     transition: width 0.2s ease;
 }
 
+.budget-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.budget-progress__ring {
+    width: 32px;
+    height: 32px;
+    transform: rotate(-90deg);
+}
+
+.budget-progress__track {
+    fill: none;
+    stroke: var(--gray-200);
+    stroke-width: 4;
+}
+
+.budget-progress__value {
+    fill: none;
+    stroke: var(--green-400);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.2s ease;
+}
+
+.budget-progress--warning .budget-progress__value {
+    stroke: #f59e0b;
+}
+
+.budget-progress--danger .budget-progress__value {
+    stroke: #f97066;
+}
+
+.budget-progress__text {
+    font-size: 12px;
+    color: var(--gray-600);
+    min-width: 32px;
+}
+
 .reports-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

@@ -70,7 +70,7 @@ $buildStatus = static function (float $limit, float $spent): array {
     return ['label' => 'В пределах', 'variant' => 'success'];
 };
 
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 $input = file_get_contents('php://input') ?: '';
 $data = json_decode($input, true);
 if (!is_array($data)) {
@@ -127,9 +127,9 @@ try {
     }
 
     if ($method === 'POST') {
-        $categoryId = (int) ($data['category_id'] ?? 0);
-        $month = (string) ($data['period_month'] ?? '');
-        $limit = (float) ($data['limit_amount'] ?? 0);
+        $categoryId = (int) (isset($data['category_id']) ? $data['category_id'] : 0);
+        $month = (string) (isset($data['period_month']) ? $data['period_month'] : '');
+        $limit = (float) (isset($data['limit_amount']) ? $data['limit_amount'] : 0);
 
         if ($categoryId <= 0 || $month === '' || $limit <= 0) {
             $respond(['error' => 'Заполните данные бюджета'], 422);
@@ -149,9 +149,9 @@ try {
         if ($budgetId <= 0) {
             $respond(['error' => 'Некорректный бюджет'], 422);
         }
-        $categoryId = (int) ($data['category_id'] ?? 0);
-        $month = (string) ($data['period_month'] ?? '');
-        $limit = (float) ($data['limit_amount'] ?? 0);
+        $categoryId = (int) (isset($data['category_id']) ? $data['category_id'] : 0);
+        $month = (string) (isset($data['period_month']) ? $data['period_month'] : '');
+        $limit = (float) (isset($data['limit_amount']) ? $data['limit_amount'] : 0);
 
         if ($categoryId <= 0 || $month === '' || $limit <= 0) {
             $respond(['error' => 'Заполните данные бюджета'], 422);
@@ -183,11 +183,13 @@ try {
     if ($method === 'POST' && $code === '23000') {
         $respond(['error' => 'Бюджет на эту категорию и месяц уже существует'], 409);
     }
-    $message = match ($method) {
-        'POST' => 'Ошибка создания бюджета',
-        'PUT' => 'Ошибка обновления бюджета',
-        'DELETE' => 'Ошибка удаления бюджета',
-        default => 'Ошибка загрузки бюджетов',
-    };
+    $message = 'Ошибка загрузки бюджетов';
+    if ($method === 'POST') {
+        $message = 'Ошибка создания бюджета';
+    } elseif ($method === 'PUT') {
+        $message = 'Ошибка обновления бюджета';
+    } elseif ($method === 'DELETE') {
+        $message = 'Ошибка удаления бюджета';
+    }
     $respond(['error' => $message], 500);
 }
