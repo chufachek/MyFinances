@@ -1771,7 +1771,7 @@ const initTransactions = async () => {
 
 const initBudgets = async () => {
     const table = byId('budgets-table');
-    const otherTable = byId('budgets-table-other');
+    const monthPicker = byId('budgets-month');
     const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
@@ -1779,7 +1779,7 @@ const initBudgets = async () => {
     const addButton = byId('budgets-add');
     const categorySelect = byId('budgets-category');
 
-    if (!table || !otherTable || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
+    if (!table || !monthPicker || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
         return;
     }
 
@@ -1793,7 +1793,7 @@ const initBudgets = async () => {
 
     const resetForm = () => {
         form.reset();
-        const month = new Date().toISOString().slice(0, 7);
+        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
         setFormValues(form, { period_month: month, budget_id: '' });
         selectFirstOption(categorySelect);
         title.textContent = 'Новый бюджет';
@@ -1815,19 +1815,44 @@ const initBudgets = async () => {
         openModal(modal);
     };
 
-    const buildStatusCell = (budget) => {
-        const status = getBudgetStatus(budget.limit_amount, budget.spent);
-        const badge = document.createElement('span');
-        const variant = status.variant || 'secondary';
-        badge.className = `badge bg-${variant}`;
-        if (variant === 'warning') {
-            badge.classList.add('text-dark');
+    const buildProgress = (budget) => {
+        const percent = budget.limit_amount > 0 ? Math.min(100, (budget.spent / budget.limit_amount) * 100) : 0;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'stack';
+
+        const progress = document.createElement('div');
+        progress.className = 'progress';
+        const bar = document.createElement('div');
+        bar.className = 'progress__bar';
+        if (budget.status_variant === 'danger') {
+            bar.classList.add('progress__bar--danger');
+        } else if (budget.status_variant === 'warning') {
+            bar.classList.add('progress__bar--warning');
         }
-        badge.textContent = status.label || 'Статус';
+        bar.style.width = `${percent}%`;
+        progress.appendChild(bar);
+
+        const label = document.createElement('span');
+        label.className = 'text-muted';
+        label.textContent = `${percent.toFixed(0)}%`;
+
+        wrapper.append(progress, label);
+        return wrapper;
+    };
+
+    const buildStatusBadge = (budget) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        if (budget.status_variant === 'danger') {
+            badge.classList.add('budget-status__label--danger');
+        } else if (budget.status_variant === 'warning') {
+            badge.classList.add('budget-status__label--warning');
+        }
+        badge.textContent = budget.status_label || 'В пределах';
         return badge;
     };
 
-    const buildBudgetRow = (budget, includeMonth = false) => {
+    const buildBudgetRow = (budget) => {
         const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
         editBtn.addEventListener('click', () => {
             openFormModal(budget);
@@ -1850,44 +1875,35 @@ const initBudgets = async () => {
         actions.className = 'table__actions';
         actions.append(editBtn, deleteBtn);
 
-        const statusCell = buildStatusCell(budget);
         const cells = [
             budget.category_name,
             formatCurrency(budget.limit_amount),
             formatCurrency(budget.spent),
-            statusCell,
+            buildProgress(budget),
+            buildStatusBadge(budget),
             actions,
         ];
-
-        if (includeMonth) {
-            cells.unshift(budget.period_month);
-        }
 
         return cells;
     };
 
     const load = async () => {
         try {
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            const { budgets } = await getJson('/api/budgets');
-            const currentBudgets = budgets.filter((budget) => budget.period_month === currentMonth);
-            const otherBudgets = budgets.filter((budget) => budget.period_month !== currentMonth);
+            const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+            monthPicker.value = month;
+            const { budgets } = await getJson(`/api/budgets?month=${month}`);
             renderTable(
                 table,
-                ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
-                currentBudgets.map((budget) => buildBudgetRow(budget))
-            );
-            renderTable(
-                otherTable,
-                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
-                otherBudgets.map((budget) => buildBudgetRow(budget, true))
+                ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
+                budgets.map((budget) => buildBudgetRow(budget))
             );
         } catch (error) {
             showError('Не удалось загрузить бюджеты.');
-            renderTable(table, ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
-            renderTable(otherTable, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
+            renderTable(table, ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
         }
     };
+
+    monthPicker.addEventListener('change', load);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();

@@ -9,16 +9,13 @@
 
     <div class="panel">
         <div class="panel__header">
-            <h3>Текущий месяц</h3>
+            <h3>Бюджеты за месяц</h3>
+            <label class="field">
+                <span>Месяц</span>
+                <input type="month" id="budgets-month">
+            </label>
         </div>
         <div id="budgets-table" class="table"></div>
-    </div>
-
-    <div class="panel">
-        <div class="panel__header">
-            <h3>Другие месяцы</h3>
-        </div>
-        <div id="budgets-table-other" class="table"></div>
     </div>
 
     <div class="modal fade" id="budgets-modal" tabindex="-1" aria-hidden="true">

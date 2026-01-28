@@ -1476,24 +1476,51 @@ const initBudgets = async () => {
         openModal(modal);
     };
 
+    const buildProgress = (budget) => {
+        const percent = budget.limit_amount > 0 ? Math.min(100, (budget.spent / budget.limit_amount) * 100) : 0;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'stack';
+
+        const progress = document.createElement('div');
+        progress.className = 'progress';
+        const bar = document.createElement('div');
+        bar.className = 'progress__bar';
+        if (budget.status_variant === 'danger') {
+            bar.classList.add('progress__bar--danger');
+        } else if (budget.status_variant === 'warning') {
+            bar.classList.add('progress__bar--warning');
+        }
+        bar.style.width = `${percent}%`;
+        progress.appendChild(bar);
+
+        const label = document.createElement('span');
+        label.className = 'text-muted';
+        label.textContent = `${percent.toFixed(0)}%`;
+
+        wrapper.append(progress, label);
+        return wrapper;
+    };
+
+    const buildStatusBadge = (budget) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        if (budget.status_variant === 'danger') {
+            badge.classList.add('budget-status__label--danger');
+        } else if (budget.status_variant === 'warning') {
+            badge.classList.add('budget-status__label--warning');
+        }
+        badge.textContent = budget.status_label || 'В пределах';
+        return badge;
+    };
+
     const load = async () => {
         const month = monthPicker.value || new Date().toISOString().slice(0, 7);
         monthPicker.value = month;
         const { budgets } = await getJson(`/api/budgets?month=${month}`);
         renderTable(
             table,
-            ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
+            ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
             budgets.map((b) => {
-                const percent = b.limit_amount > 0 ? Math.min(100, (b.spent / b.limit_amount) * 100) : 0;
-                const status = percent >= 100 ? 'Превышено' : `${percent.toFixed(0)}%`;
-
-                const progress = document.createElement('div');
-                progress.className = 'progress';
-                const bar = document.createElement('div');
-                bar.className = 'progress__bar';
-                bar.style.width = `${percent}%`;
-                progress.appendChild(bar);
-
                 const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                 editBtn.addEventListener('click', () => {
                     openFormModal(b);
@@ -1515,7 +1542,14 @@ const initBudgets = async () => {
                 actions.className = 'table__actions';
                 actions.append(editBtn, deleteBtn);
 
-                return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), progress, actions];
+                return [
+                    b.category_name,
+                    formatCurrency(b.limit_amount),
+                    formatCurrency(b.spent),
+                    buildProgress(b),
+                    buildStatusBadge(b),
+                    actions,
+                ];
             })
         );
     };
