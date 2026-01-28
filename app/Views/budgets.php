@@ -4,7 +4,7 @@
             <h1>Бюджеты</h1>
             <p class="text-muted">Лимиты расходов по категориям на месяц.</p>
         </div>
-        <button class="btn btn-primary" type="button" id="budgets-add">Добавить бюджет</button>
+        <button class="btn btn-primary" type="button" id="budgets-add" data-bs-toggle="modal" data-bs-target="#budgets-modal">Добавить бюджет</button>
     </header>
 
     <div class="panel">
