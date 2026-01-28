@@ -1074,7 +1074,7 @@ const initDashboard = async () => {
 
         if (budgetList) {
             budgetList.innerHTML = '';
-            const list = budgets.budgets || [];
+            const list = (budgets.budgets || []).filter((item) => item.period_month === month);
             if (list.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'text-muted';
@@ -1771,7 +1771,7 @@ const initTransactions = async () => {
 
 const initBudgets = async () => {
     const table = byId('budgets-table');
-    const monthPicker = byId('budgets-month');
+    const otherTable = byId('budgets-table-other');
     const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
@@ -1779,7 +1779,7 @@ const initBudgets = async () => {
     const addButton = byId('budgets-add');
     const categorySelect = byId('budgets-category');
 
-    if (!table || !monthPicker || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
+    if (!table || !otherTable || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
         return;
     }
 
@@ -1793,7 +1793,7 @@ const initBudgets = async () => {
 
     const resetForm = () => {
         form.reset();
-        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+        const month = new Date().toISOString().slice(0, 7);
         setFormValues(form, { period_month: month, budget_id: '' });
         selectFirstOption(categorySelect);
         title.textContent = 'Новый бюджет';
@@ -1827,52 +1827,67 @@ const initBudgets = async () => {
         return badge;
     };
 
+    const buildBudgetRow = (budget, includeMonth = false) => {
+        const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
+        editBtn.addEventListener('click', () => {
+            openFormModal(budget);
+        });
+
+        const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
+        deleteBtn.addEventListener('click', async () => {
+            const confirmed = await confirmAction('Удалить бюджет?', {
+                titleText: 'Удаление бюджета',
+                confirmText: 'Удалить',
+            });
+            if (!confirmed) {
+                return;
+            }
+            await requestWithToast(() => deleteJson(`/api/budgets/${budget.budget_id}`), 'Бюджет удалён');
+            await load();
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'table__actions';
+        actions.append(editBtn, deleteBtn);
+
+        const statusCell = buildStatusCell(budget);
+        const cells = [
+            budget.category_name,
+            formatCurrency(budget.limit_amount),
+            formatCurrency(budget.spent),
+            statusCell,
+            actions,
+        ];
+
+        if (includeMonth) {
+            cells.unshift(budget.period_month);
+        }
+
+        return cells;
+    };
+
     const load = async () => {
         try {
-            const month = monthPicker.value || new Date().toISOString().slice(0, 7);
-            monthPicker.value = month;
-            const { budgets } = await getJson(`/api/budgets?month=${month}`);
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const { budgets } = await getJson('/api/budgets');
+            const currentBudgets = budgets.filter((budget) => budget.period_month === currentMonth);
+            const otherBudgets = budgets.filter((budget) => budget.period_month !== currentMonth);
             renderTable(
                 table,
                 ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
-                budgets.map((b) => {
-                    const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-                    editBtn.addEventListener('click', () => {
-                        openFormModal(b);
-                    });
-
-                    const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
-                    deleteBtn.addEventListener('click', async () => {
-                        const confirmed = await confirmAction('Удалить бюджет?', {
-                            titleText: 'Удаление бюджета',
-                            confirmText: 'Удалить',
-                        });
-                        if (!confirmed) {
-                            return;
-                        }
-                        await requestWithToast(
-                            () => deleteJson(`/api/budgets/${b.budget_id}`),
-                            'Бюджет удалён'
-                        );
-                        await load();
-                    });
-
-                    const actions = document.createElement('div');
-                    actions.className = 'table__actions';
-                    actions.append(editBtn, deleteBtn);
-
-                    const statusCell = buildStatusCell(b);
-
-                    return [b.category_name, formatCurrency(b.limit_amount), formatCurrency(b.spent), statusCell, actions];
-                })
+                currentBudgets.map((budget) => buildBudgetRow(budget))
+            );
+            renderTable(
+                otherTable,
+                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
+                otherBudgets.map((budget) => buildBudgetRow(budget, true))
             );
         } catch (error) {
             showError('Не удалось загрузить бюджеты.');
             renderTable(table, ['Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
+            renderTable(otherTable, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
         }
     };
-
-    monthPicker.addEventListener('change', load);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
