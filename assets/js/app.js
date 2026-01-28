@@ -1515,7 +1515,7 @@ const initBudgets = async () => {
 
     const load = async () => {
         try {
-            const { budgets } = await getJson('/api/budgets');
+            const { budgets } = await getJson('/api/budgets.php');
             const availableMonths = [...new Set((budgets || []).map((item) => item.period_month))].sort();
             let month = monthPicker.value || new Date().toISOString().slice(0, 7);
             if (availableMonths.length > 0 && !availableMonths.includes(month)) {
@@ -1538,7 +1538,7 @@ const initBudgets = async () => {
                             return;
                         }
                         await requestWithToast(
-                            () => deleteJson(`/api/budgets/${b.budget_id}`),
+                            () => deleteJson(`/api/budgets.php?id=${b.budget_id}`),
                             'Бюджет удалён'
                         );
                         await load();
@@ -1573,13 +1573,13 @@ const initBudgets = async () => {
         delete data.budget_id;
         if (id) {
             await requestWithToast(
-                () => putJson(`/api/budgets/${id}`, data),
+                () => putJson(`/api/budgets.php?id=${id}`, data),
                 'Бюджет обновлён',
                 { showSuccess: false }
             );
             closeModalWithToast(modal, 'Бюджет обновлён');
         } else {
-            await requestWithToast(() => postJson('/api/budgets', data), 'Бюджет создан', { showSuccess: false });
+            await requestWithToast(() => postJson('/api/budgets.php', data), 'Бюджет создан', { showSuccess: false });
             closeModalWithToast(modal, 'Бюджет создан');
         }
         resetForm();
