@@ -41,6 +41,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" data-chartjs></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="<?= htmlspecialchars(($basePath ?? '') . '/assets/js/budgets.js', ENT_QUOTES) ?>"></script>
     <script type="module" src="<?= htmlspecialchars(($basePath ?? '') . '/assets/js/app.js', ENT_QUOTES) ?>"></script>
 </body>
 </html>

@@ -19,19 +19,6 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount);
 };
 
-const getBudgetStatus = (limitValue, spentValue) => {
-    const limit = Number(limitValue) || 0;
-    const spent = Number(spentValue) || 0;
-    const percent = limit > 0 ? (spent / limit) * 100 : 0;
-    if (percent >= 100) {
-        return { label: 'Превышено', variant: 'danger', percent, limit, spent };
-    }
-    if (percent >= 85) {
-        return { label: 'Почти лимит', variant: 'warning', percent, limit, spent };
-    }
-    return { label: 'В пределах', variant: 'success', percent, limit, spent };
-};
-
 const accountTypeLabels = {
     cash: 'Наличные',
     card: 'Карта',
@@ -953,7 +940,6 @@ const initDashboard = async () => {
     const categoryCtx = byId('dashboard-category');
     const monthlyCtx = byId('dashboard-monthly');
     const categoryList = byId('dashboard-category-list');
-    const budgetList = byId('dashboard-budget-list');
     let lineChart;
     let categoryChart;
     let monthlyChart;
@@ -971,7 +957,7 @@ const initDashboard = async () => {
         const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult, budgetsResult] =
+        const [summaryResult, txResult, categoryResult, dailyResult, monthlyResult] =
             await Promise.allSettled([
                 getJson(`/api/reports/summary?dateFrom=${dateFrom}&dateTo=${dateTo}`),
                 getJson('/api/transactions?limit=5'),
@@ -984,7 +970,6 @@ const initDashboard = async () => {
                           )}&groupBy=month&type=expense`
                       )
                     : Promise.resolve({ labels: [], expense: [] }),
-                budgetList ? getJson('/api/budgets.php') : Promise.resolve({ budgets: [] }),
             ]);
 
         if (
@@ -992,8 +977,7 @@ const initDashboard = async () => {
             txResult.status === 'rejected' ||
             categoryResult.status === 'rejected' ||
             dailyResult.status === 'rejected' ||
-            monthlyResult.status === 'rejected' ||
-            budgetsResult.status === 'rejected'
+            monthlyResult.status === 'rejected'
         ) {
             showError('Не удалось загрузить все данные дашборда.');
         }
@@ -1018,10 +1002,6 @@ const initDashboard = async () => {
             monthlyResult.status === 'fulfilled'
                 ? monthlyResult.value
                 : { labels: [], expense: [] };
-        const budgets =
-            budgetsResult.status === 'fulfilled'
-                ? budgetsResult.value
-                : { budgets: [] };
 
         setText('summary-balance', formatCurrency(summary.balance));
         setText('summary-income', formatCurrency(summary.income));
@@ -1069,87 +1049,6 @@ const initDashboard = async () => {
                     )}</span>`;
                     categoryList.appendChild(row);
                 });
-            }
-        }
-
-        if (budgetList) {
-            budgetList.innerHTML = '';
-            const availableBudgets = budgets.budgets || [];
-            const availableMonths = [...new Set(availableBudgets.map((item) => item.period_month))].sort();
-            const fallbackMonth = availableMonths[availableMonths.length - 1];
-            const targetMonth = availableMonths.includes(month) ? month : fallbackMonth;
-            const list = availableBudgets.filter((item) => item.period_month === targetMonth);
-            if (list.length === 0) {
-                const empty = document.createElement('p');
-                empty.className = 'text-muted';
-                empty.textContent = getRandomEmptyMessage();
-                budgetList.appendChild(empty);
-            } else {
-                list
-                    .map((item) => {
-                        const status = getBudgetStatus(item.limit_amount, item.spent);
-                        const percent = Math.round(status.percent);
-                        return {
-                            ...item,
-                            limit: status.limit,
-                            spent: status.spent,
-                            percent,
-                            status_label: status.label,
-                            status_variant: status.variant,
-                        };
-                    })
-                    .sort((a, b) => b.percent - a.percent)
-                    .slice(0, 3)
-                    .forEach((item) => {
-                        const row = document.createElement('div');
-                        row.className = 'budget-status';
-
-                        const header = document.createElement('div');
-                        header.className = 'budget-status__header';
-
-                        const title = document.createElement('span');
-                        title.textContent = item.category_name;
-
-                        const badge = document.createElement('span');
-                        const variant = item.status_variant || 'success';
-                        badge.className = 'badge';
-                        if (variant === 'danger') {
-                            badge.classList.add('budget-status__label--danger');
-                        } else if (variant === 'warning') {
-                            badge.classList.add('budget-status__label--warning');
-                        }
-                        badge.textContent = item.status_label || 'В пределах';
-
-                        header.append(title, badge);
-
-                        const value = document.createElement('span');
-                        value.className = 'budget-status__value';
-                        if (variant === 'danger') {
-                            value.classList.add('budget-status__value--danger');
-                        } else if (variant === 'warning') {
-                            value.classList.add('budget-status__value--warning');
-                        }
-                        value.textContent = `${formatCurrency(item.spent)} из ${formatCurrency(item.limit)}`;
-
-                        const progress = document.createElement('div');
-                        progress.className = 'progress progress--budget';
-                        const bar = document.createElement('div');
-                        bar.className = 'progress__bar';
-                        if (variant === 'danger') {
-                            bar.classList.add('progress__bar--danger');
-                        } else if (variant === 'warning') {
-                            bar.classList.add('progress__bar--warning');
-                        }
-                        bar.style.width = `${Math.min(item.percent, 100)}%`;
-                        progress.appendChild(bar);
-
-                        const meta = document.createElement('span');
-                        meta.className = 'budget-status__meta';
-                        meta.textContent = `Использовано: ${item.percent}%`;
-
-                        row.append(header, value, progress, meta);
-                        budgetList.appendChild(row);
-                    });
             }
         }
 
@@ -1773,213 +1672,6 @@ const initTransactions = async () => {
     await loadTransfers();
 };
 
-const initBudgets = async () => {
-    const currentTable = byId('budgets-current-table');
-    const historyTable = byId('budgets-history-table');
-    const modal = byId('budgets-modal');
-    const form = byId('budgets-form');
-    const title = byId('budgets-form-title');
-    const cancel = byId('budgets-cancel');
-    const addButton = byId('budgets-add');
-    const categorySelect = byId('budgets-category');
-
-    if (!currentTable || !historyTable || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
-        return;
-    }
-
-    try {
-        const { categories } = await getJson('/api/categories?type=expense');
-        fillSelect(categorySelect, categories.map((cat) => ({ value: cat.category_id, label: cat.name })), 'Выберите');
-    } catch (error) {
-        showError('Не удалось загрузить категории.');
-        fillSelect(categorySelect, [], 'Выберите');
-    }
-
-    const resetForm = () => {
-        form.reset();
-        const month = new Date().toISOString().slice(0, 7);
-        setFormValues(form, { period_month: month, budget_id: '' });
-        selectFirstOption(categorySelect);
-        title.textContent = 'Новый бюджет';
-    };
-
-    const openFormModal = (budget = null) => {
-        if (budget) {
-            setFormValues(form, {
-                budget_id: budget.budget_id,
-                category_id: budget.category_id,
-                period_month: budget.period_month,
-                limit_amount: budget.limit_amount,
-            });
-            title.textContent = `Редактирование: ${budget.category_name}`;
-            openModal(modal);
-            return;
-        }
-        resetForm();
-        openModal(modal);
-    };
-
-    const buildProgress = (budget) => {
-        const percent = budget.limit_amount > 0 ? Math.min(100, (budget.spent / budget.limit_amount) * 100) : 0;
-        const size = 32;
-        const stroke = 4;
-        const radius = (size - stroke) / 2;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (percent / 100) * circumference;
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'budget-progress';
-        if (budget.status_variant === 'danger') {
-            wrapper.classList.add('budget-progress--danger');
-        } else if (budget.status_variant === 'warning') {
-            wrapper.classList.add('budget-progress--warning');
-        }
-
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.classList.add('budget-progress__ring');
-        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-        svg.setAttribute('width', size);
-        svg.setAttribute('height', size);
-
-        const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        track.classList.add('budget-progress__track');
-        track.setAttribute('cx', size / 2);
-        track.setAttribute('cy', size / 2);
-        track.setAttribute('r', radius);
-
-        const value = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        value.classList.add('budget-progress__value');
-        value.setAttribute('cx', size / 2);
-        value.setAttribute('cy', size / 2);
-        value.setAttribute('r', radius);
-        value.setAttribute('stroke-dasharray', `${circumference} ${circumference}`);
-        value.setAttribute('stroke-dashoffset', offset);
-
-        svg.append(track, value);
-
-        const label = document.createElement('span');
-        label.className = 'budget-progress__text';
-        label.textContent = `${percent.toFixed(0)}%`;
-
-        wrapper.append(svg, label);
-        return wrapper;
-    };
-
-    const buildStatusBadge = (budget) => {
-        const badge = document.createElement('span');
-        badge.className = 'badge';
-        if (budget.status_variant === 'danger') {
-            badge.classList.add('budget-status__label--danger');
-        } else if (budget.status_variant === 'warning') {
-            badge.classList.add('budget-status__label--warning');
-        }
-        badge.textContent = budget.status_label || 'В пределах';
-        return badge;
-    };
-
-    const buildActions = (budget) => {
-        const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
-        editBtn.addEventListener('click', () => {
-            openFormModal(budget);
-        });
-
-        const deleteBtn = createIconButton({ icon: '🗑️', label: 'Удалить бюджет', variant: 'outline' });
-        deleteBtn.addEventListener('click', async () => {
-            const confirmed = await confirmAction('Удалить бюджет?', {
-                titleText: 'Удаление бюджета',
-                confirmText: 'Удалить',
-            });
-            if (!confirmed) {
-                return;
-            }
-            await requestWithToast(
-                () => deleteJson(`/api/budgets.php?id=${budget.budget_id}`),
-                'Бюджет удалён'
-            );
-            await load();
-        });
-
-        const actions = document.createElement('div');
-        actions.className = 'table__actions';
-        actions.append(editBtn, deleteBtn);
-        return actions;
-    };
-
-    const load = async () => {
-        try {
-            const { budgets } = await getJson('/api/budgets.php');
-            const sortedBudgets = [...(budgets || [])].sort((a, b) => b.period_month.localeCompare(a.period_month));
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            const currentBudgets = sortedBudgets.filter((budget) => budget.period_month === currentMonth);
-            const historyBudgets = sortedBudgets.filter((budget) => budget.period_month !== currentMonth);
-
-            renderTable(
-                currentTable,
-                ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
-                currentBudgets.map((budget) => [
-                    budget.category_name,
-                    formatCurrency(budget.limit_amount),
-                    formatCurrency(budget.spent),
-                    buildProgress(budget),
-                    buildStatusBadge(budget),
-                    buildActions(budget),
-                ])
-            );
-            renderTable(
-                historyTable,
-                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'],
-                historyBudgets.map((budget) => [
-                    budget.period_month,
-                    budget.category_name,
-                    formatCurrency(budget.limit_amount),
-                    formatCurrency(budget.spent),
-                    buildStatusBadge(budget),
-                    buildActions(budget),
-                ])
-            );
-        } catch (error) {
-            showError('Не удалось загрузить бюджеты.');
-            renderTable(currentTable, ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
-            renderTable(historyTable, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Статус', 'Действия'], []);
-        }
-    };
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const data = serializeForm(form);
-        const id = data.budget_id;
-        delete data.budget_id;
-        if (id) {
-            await requestWithToast(
-                () => putJson(`/api/budgets.php?id=${id}`, data),
-                'Бюджет обновлён',
-                { showSuccess: false }
-            );
-            resetForm();
-            await load();
-            closeModalWithToast(modal, 'Бюджет обновлён');
-            return;
-        }
-        await requestWithToast(() => postJson('/api/budgets.php', data), 'Бюджет создан', { showSuccess: false });
-        resetForm();
-        await load();
-        closeModalWithToast(modal, 'Бюджет создан');
-    });
-
-    cancel.addEventListener('click', () => {
-        resetForm();
-        closeModal(modal);
-    });
-
-    if (addButton) {
-        addButton.addEventListener('click', () => openFormModal());
-    }
-
-    modal.addEventListener('hidden.bs.modal', resetForm);
-
-    await load();
-};
-
 const initGoals = async () => {
     const list = byId('goals-list');
     const modal = byId('goals-modal');
@@ -2211,9 +1903,6 @@ if (page === 'categories') {
 }
 if (page === 'transactions') {
     initTransactions().catch(console.error);
-}
-if (page === 'budgets') {
-    initBudgets().catch(console.error);
 }
 if (page === 'goals') {
     initGoals().catch(console.error);
