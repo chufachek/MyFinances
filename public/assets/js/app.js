@@ -39,68 +39,62 @@ const ensureToastContainer = () => {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.className = 'toast-container';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
         document.body.appendChild(container);
     }
     return container;
 };
 
 const toastVariants = {
-    success: { title: 'Успешно', icon: '✅', role: 'status' },
-    error: { title: 'Ошибка', icon: '⚠️', role: 'alert' },
-    warning: { title: 'Внимание', icon: '⚠️', role: 'status' },
-    info: { title: 'Информация', icon: 'ℹ️', role: 'status' },
+    success: { title: 'Успешно', role: 'status', color: 'success' },
+    error: { title: 'Ошибка', role: 'alert', color: 'danger' },
+    warning: { title: 'Внимание', role: 'status', color: 'warning' },
+    info: { title: 'Информация', role: 'status', color: 'info' },
 };
 
 const showToast = (message, variant = 'success') => {
     const container = ensureToastContainer();
     const toast = document.createElement('div');
     const config = toastVariants[variant] ?? toastVariants.success;
-    toast.className = `toast toast--${variant}`;
+    toast.className = `toast align-items-center text-bg-${config.color} border-0 fade`;
     toast.setAttribute('role', config.role);
     toast.setAttribute('aria-live', 'polite');
-
-    const icon = document.createElement('span');
-    icon.className = 'toast__icon';
-    icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = config.icon;
+    toast.setAttribute('aria-atomic', 'true');
 
     const content = document.createElement('div');
-    content.className = 'toast__content';
+    content.className = 'd-flex';
+
+    const body = document.createElement('div');
+    body.className = 'toast-body';
 
     const title = document.createElement('strong');
-    title.className = 'toast__title';
+    title.className = 'me-2';
     title.textContent = config.title;
 
     const text = document.createElement('span');
-    text.className = 'toast__message';
     text.textContent = message;
 
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
-    closeButton.className = 'toast__close';
-    closeButton.setAttribute('aria-label', 'Закрыть уведомление');
-    closeButton.textContent = '✕';
+    closeButton.className = 'btn-close btn-close-white me-2 m-auto';
+    closeButton.setAttribute('data-bs-dismiss', 'toast');
+    closeButton.setAttribute('aria-label', 'Закрыть');
 
-    content.appendChild(title);
-    content.appendChild(text);
-    toast.appendChild(icon);
+    body.appendChild(title);
+    body.appendChild(text);
+    content.appendChild(body);
+    content.appendChild(closeButton);
     toast.appendChild(content);
-    toast.appendChild(closeButton);
     container.appendChild(toast);
 
-    let removeTimeout;
-    const closeToast = () => {
-        toast.classList.remove('is-visible');
-        clearTimeout(removeTimeout);
-        setTimeout(() => toast.remove(), 300);
-    };
-
-    closeButton.addEventListener('click', closeToast);
-    requestAnimationFrame(() => {
-        toast.classList.add('is-visible');
-    });
-    removeTimeout = setTimeout(closeToast, 4500);
+    if (window.bootstrap?.Toast) {
+        const instance = window.bootstrap.Toast.getOrCreateInstance(toast, { delay: 4500 });
+        toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        instance.show();
+    } else {
+        toast.classList.add('show');
+        setTimeout(() => toast.remove(), 4500);
+    }
 };
 
 const requestWithToast = async (callback, successMessage, options = {}) => {

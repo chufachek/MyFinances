@@ -25,25 +25,62 @@ const ensureToastContainer = () => {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.className = 'toast-container';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
         document.body.appendChild(container);
     }
     return container;
 };
 
+const toastVariants = {
+    success: { title: 'Успешно', role: 'status', color: 'success' },
+    error: { title: 'Ошибка', role: 'alert', color: 'danger' },
+    warning: { title: 'Внимание', role: 'status', color: 'warning' },
+    info: { title: 'Информация', role: 'status', color: 'info' },
+};
+
 const showToast = (message, variant = 'success') => {
     const container = ensureToastContainer();
     const toast = document.createElement('div');
-    toast.className = `toast toast--${variant}`;
-    toast.innerHTML = `<strong>${variant === 'error' ? 'Ошибка' : 'Готово'}</strong><span>${message}</span>`;
+    const config = toastVariants[variant] ?? toastVariants.success;
+    toast.className = `toast align-items-center text-bg-${config.color} border-0 fade`;
+    toast.setAttribute('role', config.role);
+    toast.setAttribute('aria-live', 'polite');
+    toast.setAttribute('aria-atomic', 'true');
+
+    const content = document.createElement('div');
+    content.className = 'd-flex';
+
+    const body = document.createElement('div');
+    body.className = 'toast-body';
+
+    const title = document.createElement('strong');
+    title.className = 'me-2';
+    title.textContent = config.title;
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn-close btn-close-white me-2 m-auto';
+    closeButton.setAttribute('data-bs-dismiss', 'toast');
+    closeButton.setAttribute('aria-label', 'Закрыть');
+
+    body.appendChild(title);
+    body.appendChild(text);
+    content.appendChild(body);
+    content.appendChild(closeButton);
+    toast.appendChild(content);
     container.appendChild(toast);
-    requestAnimationFrame(() => {
-        toast.classList.add('is-visible');
-    });
-    setTimeout(() => {
-        toast.classList.remove('is-visible');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+
+    if (window.bootstrap?.Toast) {
+        const instance = window.bootstrap.Toast.getOrCreateInstance(toast, { delay: 4500 });
+        toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        instance.show();
+    } else {
+        toast.classList.add('show');
+        setTimeout(() => toast.remove(), 4500);
+    }
 };
 
 const requestWithToast = async (callback, successMessage, options = {}) => {
