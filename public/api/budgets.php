@@ -89,8 +89,6 @@ try {
 
     if ($method === 'GET') {
         $hasTransactions = $hasTable($pdo, 'transactions');
-        $month = isset($_GET['month']) ? trim((string) $_GET['month']) : '';
-        $monthFilter = $month !== '' ? ' AND b.period_month = :month' : '';
         if ($hasTransactions) {
             $stmt = $pdo->prepare(
                 "SELECT b.*, c.name AS category_name, IFNULL(SUM(t.amount), 0) AS spent
@@ -101,7 +99,7 @@ try {
                     AND t.category_id = b.category_id
                     AND t.tx_type = 'expense'
                     AND DATE_FORMAT(t.tx_date, '%Y-%m') = b.period_month
-                 WHERE b.user_id = :user_id{$monthFilter}
+                 WHERE b.user_id = :user_id
                  GROUP BY b.budget_id
                  ORDER BY b.period_month DESC, c.name"
             );
@@ -110,14 +108,11 @@ try {
                 "SELECT b.*, c.name AS category_name, 0 AS spent
                  FROM budgets b
                  JOIN categories c ON c.category_id = b.category_id
-                 WHERE b.user_id = :user_id{$monthFilter}
+                 WHERE b.user_id = :user_id
                  ORDER BY b.period_month DESC, c.name"
             );
         }
         $params = ['user_id' => Auth::userId()];
-        if ($month !== '') {
-            $params['month'] = $month;
-        }
         $stmt->execute($params);
         $budgets = $stmt->fetchAll();
         foreach ($budgets as &$budget) {

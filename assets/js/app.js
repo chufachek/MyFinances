@@ -1433,7 +1433,6 @@ const initTransactions = async () => {
 
 const initBudgets = async () => {
     const table = byId('budgets-table');
-    const monthPicker = byId('budgets-month');
     const modal = byId('budgets-modal');
     const form = byId('budgets-form');
     const title = byId('budgets-form-title');
@@ -1441,7 +1440,7 @@ const initBudgets = async () => {
     const addButton = byId('budgets-add');
     const categorySelect = byId('budgets-category');
 
-    if (!table || !monthPicker || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
+    if (!table || !modal || !form || !title || !cancel || !addButton || !categorySelect) {
         return;
     }
 
@@ -1455,7 +1454,7 @@ const initBudgets = async () => {
 
     const resetForm = () => {
         form.reset();
-        const month = monthPicker.value || new Date().toISOString().slice(0, 7);
+        const month = new Date().toISOString().slice(0, 7);
         setFormValues(form, { period_month: month, budget_id: '' });
         selectFirstOption(categorySelect);
         title.textContent = 'Новый бюджет';
@@ -1516,17 +1515,11 @@ const initBudgets = async () => {
     const load = async () => {
         try {
             const { budgets } = await getJson('/api/budgets.php');
-            const availableMonths = [...new Set((budgets || []).map((item) => item.period_month))].sort();
-            let month = monthPicker.value || new Date().toISOString().slice(0, 7);
-            if (availableMonths.length > 0 && !availableMonths.includes(month)) {
-                month = availableMonths[availableMonths.length - 1];
-            }
-            monthPicker.value = month;
-            const filteredBudgets = (budgets || []).filter((budget) => budget.period_month === month);
+            const sortedBudgets = [...(budgets || [])].sort((a, b) => b.period_month.localeCompare(a.period_month));
             renderTable(
                 table,
-                ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
-                filteredBudgets.map((b) => {
+                ['Месяц', 'Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'],
+                sortedBudgets.map((b) => {
                     const editBtn = createIconButton({ icon: '✏️', label: 'Редактировать' });
                     editBtn.addEventListener('click', () => {
                         openFormModal(b);
@@ -1549,6 +1542,7 @@ const initBudgets = async () => {
                     actions.append(editBtn, deleteBtn);
 
                     return [
+                        b.period_month,
                         b.category_name,
                         formatCurrency(b.limit_amount),
                         formatCurrency(b.spent),
@@ -1560,11 +1554,9 @@ const initBudgets = async () => {
             );
         } catch (error) {
             showError('Не удалось загрузить бюджеты.');
-            renderTable(table, ['Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
+            renderTable(table, ['Месяц', 'Категория', 'Лимит', 'Факт', 'Прогресс', 'Статус', 'Действия'], []);
         }
     };
-
-    monthPicker.addEventListener('change', load);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
